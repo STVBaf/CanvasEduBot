@@ -12,6 +12,5 @@
 canvas-course-helper/
   web/        # Next.js 前端
   server/     # NestJS 后端
-  agents/     # Agent 与自动化任务
   docs/       # 文档、说明材料
 ```
