@@ -1,58 +1,48 @@
-// prisma/schema.prisma
+datasource db {
+	provider = "mysql"
+	url      = env("DATABASE_URL")
+}
 
 generator client {
-  provider = "prisma-client-js"
+	provider = "prisma-client-js"
 }
 
-datasource db {
-  provider = "postgresql"
-  // 直接使用你的账号密码连接，绕过环境变量问题
-  url      = env("DATABASE_URL")
-}
-
-// 1. 用户表
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // 关联关系
-  tokens    Token[]
-  files     FileMeta[]
+	id        String   @id @default(cuid())
+	email     String   @unique
+	name      String?
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+	tokens    Token[]
+	files     FileMeta[]
 }
 
-// 2. 授权信息表
 model Token {
-  id           Int      @id @default(autoincrement())
-  accessToken  String
-  refreshToken String?
-  platform     String   @default("CANVAS")
-  expiresAt    DateTime?
-  createdAt    DateTime @default(now())
-  
-  userId       Int
-  user         User     @relation(fields: [userId], references: [id])
+	id             String   @id @default(cuid())
+	user           User     @relation(fields: [userId], references: [id])
+	userId         String
+	provider       String
+	providerUserId String?  
+	accessToken    String
+	refreshToken   String?
+	expiresAt      DateTime?
+	scope          String?
+	createdAt      DateTime @default(now())
+	updatedAt      DateTime @updatedAt
+	// Ensure uniqueness of provider + providerUserId when present
+	@@unique([provider, providerUserId])
 }
 
-// 3. 文件元信息表
 model FileMeta {
-  id           String   @id @default(uuid())
-  originalName String
-  localPath    String?
-  s3Key        String?
-  canvasFileId String?  @unique
-  courseCode   String?
-  fileType     String
-  summary      String?  // 注意：这里用 String? 而不是 Text，Prisma 会自动处理
-  isProcessed  Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  userId       Int
-  user         User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@index([courseCode])
+	id           String   @id @default(cuid())
+	user         User     @relation(fields: [userId], references: [id])
+	userId       String
+	courseId     String
+	canvasFileId String   @unique
+	fileName     String
+	downloadUrl  String
+	localPath    String?
+	status       String   @default("pending")
+	createdAt    DateTime @default(now())
+	updatedAt    DateTime @updatedAt
 }
