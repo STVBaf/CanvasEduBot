@@ -6,6 +6,19 @@
 - Node.js v22+ 和 npm 已安装 ✅
 - MySQL 8.0+ 运行中（本地或 Docker）
 - Redis 运行中（本地或 Docker）
+- **Canvas Access Token**（从 Canvas 个人设置中生成）
+
+> **重要提示：**当前版本使用手动生成的 Canvas Access Token 进行登录。
+> 等获得 Canvas Developer Key 后将启用 OAuth2 流程。
+
+### 如何获取 Canvas Access Token
+
+1. 登录你的 Canvas 账号
+2. 点击右上角的个人头像 → **Settings**（设置）
+3. 滚动到 **Approved Integrations**（已批准的集成）
+4. 点击 **+ New Access Token**（新访问令牌）
+5. 输入描述（例如 "Canvas Helper"）并点击 **Generate Token**
+6. **复制并保存** token（只显示一次！）
 
 ### 快速命令
 
@@ -52,16 +65,26 @@ curl http://localhost:3000/api
 # 返回: 200 或 404 说明服务正常
 ```
 
-### 测试 2: OAuth 登录流程
+### 测试 2: 使用手动 Token 登录
 ```bash
-# 获取授权 URL
-curl http://localhost:3000/api/auth/login
-# 返回 Canvas OAuth URL，复制到浏览器访问
+# 替换 YOUR_CANVAS_ACCESS_TOKEN 为你从 Canvas 生成的 token
+curl -X POST http://localhost:3000/api/auth/login/manual \
+  -H "Content-Type: application/json" \
+  -d '{"accessToken": "YOUR_CANVAS_ACCESS_TOKEN"}'
+
+# 返回示例：
+# {
+#   "userId": "...",
+#   "email": "your@email.com",
+#   "name": "Your Name",
+#   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+#   "message": "登录成功！使用手动生成的 Canvas Access Token"
+# }
 ```
 
 ### 测试 3: 使用 JWT 获取课程列表
 ```bash
-# 将 TOKEN 替换为从 OAuth 回调中获得的 JWT
+# 将 TOKEN 替换为上一步获得的 JWT
 TOKEN="your_jwt_token"
 curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/courses
 ```
@@ -109,13 +132,13 @@ canvas-helper/
 | 变量 | 说明 | 示例 |
 |------|------|------|
 | `CANVAS_BASE_URL` | Canvas 实例 URL | `https://canvas.shufe.edu.cn/` |
-| `CANVAS_CLIENT_ID` | OAuth 应用 ID | `2023111347` |
-| `CANVAS_CLIENT_SECRET` | OAuth 应用密钥 | ⚠️ 安全敏感 |
-| `CANVAS_REDIRECT_URI` | OAuth 回调地址 | `http://localhost:3000/api/auth/callback` |
 | `JWT_SECRET` | JWT 签名密钥 | ⚠️ 使用强密码 |
 | `DATABASE_URL` | MySQL 连接字符串 | `mysql://root:password@localhost:3306/canvas_helper` |
 | `REDIS_URL` | Redis 连接字符串 | `redis://localhost:6379` |
 | `FILE_STORAGE_DIR` | 文件存储目录 | `./files` |
+
+> **注意：**OAuth2 相关变量（`CANVAS_CLIENT_ID`, `CANVAS_CLIENT_SECRET`, `CANVAS_REDIRECT_URI`）
+> 当前不需要配置，等获得 Developer Key 后再设置。
 
 ---
 
@@ -123,10 +146,31 @@ canvas-helper/
 
 | 方法 | 端点 | 说明 | 认证 |
 |------|------|------|------|
-| GET | `/api/auth/login` | 开始 OAuth 流程 | ❌ |
-| GET | `/api/auth/callback` | OAuth 回调 | ❌ |
+| POST | `/api/auth/login/manual` | 使用手动 token 登录 | ❌ |
 | GET | `/api/courses` | 获取用户课程列表 | ✅ JWT |
 | POST | `/api/files/sync` | 同步课程文件 | ✅ JWT |
+
+### 登录示例
+
+```bash
+curl -X POST http://localhost:3000/api/auth/login/manual \
+  -H "Content-Type: application/json" \
+  -d '{
+    "accessToken": "your_canvas_access_token",
+    "email": "your@email.com"
+  }'
+```
+
+返回示例：
+```json
+{
+  "userId": "clxxxxx",
+  "email": "your@email.com",
+  "name": "Your Name",
+  "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "message": "登录成功！使用手动生成的 Canvas Access Token"
+}
+```
 
 ---
 

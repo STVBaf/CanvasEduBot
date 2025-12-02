@@ -4,6 +4,9 @@
 
 本仓库采用单仓库（Monorepo）结构，包含前端、后端与 Agent 模块。
 
+> **重要提示：**当前版本使用手动生成的 Canvas Access Token 进行登录。  
+> 等获得 Canvas Developer Key 后将启用 OAuth2 流程。
+
 ---
 
 ## 目录结构

@@ -14,4 +14,8 @@ export class CoursesService {
     const courses = await this.canvas.getCourses(accessToken);
     return courses;
   }
+
+  async getCoursesByToken(accessToken: string) {
+    return this.canvas.getCourses(accessToken);
+  }
 }

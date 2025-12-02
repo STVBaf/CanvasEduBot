@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 
 // ⚠️ 注意：这里假设我们要把数据关联到 ID 为 1 的用户
 // (也就是你之前用 script.ts 创建的那个测试用户)
-const TARGET_USER_ID = 1; 
+const TARGET_USER_ID = '1'; 
 
 async function main() {
   console.log('🚀 开始同步 Canvas 数据...');
@@ -48,15 +48,15 @@ async function main() {
       // 写入新文件记录
       await prisma.fileMeta.create({
         data: {
-            originalName: file.display_name,
+            fileName: file.display_name,
             canvasFileId: String(file.id),
-            courseCode: course.course_code || 'UNKNOWN',
+            courseId: String(course.id),
             
-            fileType: file.content_type?.split('/')[1] || 'unknown',
+            // fileType: file.content_type?.split('/')[1] || 'unknown',
   
             userId: TARGET_USER_ID,
-            localPath: file.url,
-            isProcessed: false,
+            downloadUrl: file.url,
+            status: 'pending',
           }
       });
       console.log(`   ✅ 已同步入库: ${file.display_name}`);
