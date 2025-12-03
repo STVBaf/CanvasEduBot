@@ -117,6 +117,11 @@ export class CanvasService {
 		try {
 			const res = await axios.get(url, {
 				headers: { Authorization: `Bearer ${cleanToken}` },
+				params: {
+					enrollment_state: 'active',  // 只获取激活的课程
+					per_page: 100,                // 每页100条（Canvas最大值）
+					include: ['term']             // 包含学期信息
+				}
 			});
 			this.logger.log(`Successfully fetched ${res.data.length} courses`);
 			return res.data;

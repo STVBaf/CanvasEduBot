@@ -50,15 +50,6 @@ web/.turbo/
 # 后端：NestJS (server/)
 # -----------------------------
 server/dist/
-server/src/**/*.js
-server/src/**/*.js.map
-server/src/**/*.d.ts
-server/src/**/*.d.ts.map
-server/*.js
-server/*.js.map
-server/*.d.ts
-server/*.d.ts.map
-server/dist/
 server/.husky/_/
 server/.eslintcache
 server/files/
