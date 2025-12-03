@@ -3,3 +3,8 @@ node_modules
 .env
 
 /generated/prisma
+
+# 测试脚本（包含敏感 Token）
+test-api.js
+test-sync.js
+check-files.js

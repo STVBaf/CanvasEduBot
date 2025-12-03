@@ -52,6 +52,7 @@ web/.turbo/
 server/dist/
 server/.husky/_/
 server/.eslintcache
+server/files/
 
 # -----------------------------
 # 日志文件

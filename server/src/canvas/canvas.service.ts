@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,9 +7,11 @@ import { addSeconds } from 'date-fns';
 @Injectable()
 export class CanvasService {
 	private baseUrl: string;
+	private readonly logger = new Logger(CanvasService.name);
 
 	constructor(private readonly config: ConfigService, private readonly prisma: PrismaService) {
-		this.baseUrl = this.config.get<string>('CANVAS_BASE_URL') ?? '';
+		const url = this.config.get<string>('CANVAS_BASE_URL') ?? '';
+		this.baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
 	}
 
 	async getUserProfile(accessToken: string) {
@@ -98,36 +100,37 @@ export class CanvasService {
 		if (!token) {
 			throw new UnauthorizedException('No Canvas token');
 		}
-		if (token.expiresAt && token.expiresAt > new Date()) {
+		// 手动生成的 token 是长期有效的，直接返回
+		// 如果 expiresAt 为 null，表示是手动 token
+		if (!token.expiresAt || token.expiresAt > new Date()) {
 			return token.accessToken;
 		}
-		if (token.refreshToken) {
-			try {
-				const t = await this.refreshToken(token.refreshToken);
-				const newAccess = t.access_token;
-				const newRefresh = t.refresh_token ?? token.refreshToken;
-				const expiresIn = t.expires_in ?? 3600;
-				await this.prisma.token.update({
-					where: { id: token.id },
-					data: {
-						accessToken: newAccess,
-						refreshToken: newRefresh ?? undefined,
-						expiresAt: addSeconds(new Date(), expiresIn),
-					},
-				});
-				return newAccess;
-			} catch (e) {
-				throw new UnauthorizedException('Failed to refresh token');
-			}
-		}
-		throw new UnauthorizedException('Canvas token expired and no refresh token available');
+		// 如果 token 已过期且没有 refresh token，抛出异常
+		// 注意：手动 token 通常不会过期，这里主要是为了兼容未来可能的 OAuth2
+		throw new UnauthorizedException('Canvas token expired. Please login again with a valid access token.');
 	}
 
 	async getCourses(accessToken: string) {
-		const res = await axios.get(`${this.baseUrl}/api/v1/courses`, {
-			headers: { Authorization: `Bearer ${accessToken}` },
-		});
-		return res.data;
+		const url = `${this.baseUrl}/api/v1/courses`;
+		const cleanToken = accessToken.trim();
+
+		try {
+			const res = await axios.get(url, {
+				headers: { Authorization: `Bearer ${cleanToken}` },
+				params: {
+					enrollment_state: 'active',  // 只获取激活的课程
+					per_page: 100,                // 每页100条（Canvas最大值）
+					include: ['term']             // 包含学期信息
+				}
+			});
+			this.logger.log(`Successfully fetched ${res.data.length} courses`);
+			return res.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				this.logger.error(`Failed to fetch courses: ${error.response?.status} - ${error.response?.data?.message || error.message}`);
+			}
+			throw error;
+		}
 	}
 
 	async getCourseFiles(accessToken: string, courseId: string) {

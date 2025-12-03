@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Controller, Get, Query, Res, Post, Body } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
@@ -11,6 +11,10 @@ export class AuthController {
     private readonly jwt: JwtService,
   ) {}
 
+  // ========================================
+  // OAuth2 路由（暂时注释，等获得 Developer Key 后启用）
+  // ========================================
+  /*
   @Get('login')
   login(@Res() res: Response) {
     const state = randomBytes(8).toString('hex');
@@ -31,6 +35,21 @@ export class AuthController {
     const result = await this.auth.handleCallback(code);
     const redirectUrl = `/callback?status=success&token=${encodeURIComponent(result.jwt)}`;
     return res.redirect(redirectUrl);
+  }
+  */
+
+  // ========================================
+  // 手动 Token 登录（当前使用方式）
+  // ========================================
+  @Post('login/manual')
+  async loginWithManualToken(
+    @Body('accessToken') accessToken: string,
+    @Body('email') email?: string,
+  ) {
+    if (!accessToken) {
+      return { error: 'accessToken is required' };
+    }
+    return this.auth.loginWithManualToken(accessToken, email);
   }
 
   @Get('test-token')

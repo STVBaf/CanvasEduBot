@@ -12,6 +12,10 @@ export class AuthService {
     private readonly jwt: JwtService,
   ) {}
 
+  // ========================================
+  // OAuth2 方法（暂时注释，等获得 Developer Key 后启用）
+  // ========================================
+  /*
   getAuthorizeUrl(state: string) {
     return this.canvas.getAuthorizeUrl(state);
   }
@@ -66,6 +70,87 @@ export class AuthService {
 
     const jwtToken = this.jwt.sign({ sub: meRes.id });
     return { userId: meRes.id, jwt: jwtToken };
+  }
+  */
+
+  // ========================================
+  // 手动 Token 登录（当前使用方式）
+  // ========================================
+  async loginWithManualToken(accessToken: string, email?: string) {
+    // 1. 使用 access token 获取用户信息
+    const profile = await this.canvas.getUserProfile(accessToken);
+    const providerUserId = profile?.id ? String(profile.id) : undefined;
+    const userEmail = email ?? profile?.primary_email ?? profile?.login_id ?? `canvas_user_${Date.now()}@example.com`;
+
+    // 2. 创建或更新用户和 token
+    const meRes = await this.prisma.$transaction(async () => {
+      // 先查找是否已有该用户
+      let user = await this.prisma.user.findUnique({
+        where: { email: userEmail },
+      });
+
+      if (!user) {
+        // 创建新用户
+        user = await this.prisma.user.create({
+          data: {
+            email: userEmail,
+            ...(profile?.name && { name: profile.name }),
+          },
+        });
+      } else {
+        // 更新用户信息
+        user = await this.prisma.user.update({
+          where: { email: userEmail },
+          data: {
+            ...(profile?.name && { name: profile.name }),
+          },
+        });
+      }
+
+      // 查找或创建 token（手动生成的 token 通常是长期有效的）
+      const existingToken = await this.prisma.token.findFirst({
+        where: { userId: user.id, provider: 'canvas' },
+      });
+
+      if (existingToken) {
+        // 更新现有 token
+        await this.prisma.token.update({
+          where: { id: existingToken.id },
+          data: {
+            accessToken,
+            providerUserId: providerUserId ?? null,
+            // 手动生成的 token 没有过期时间，设置为 null 或很远的未来
+            expiresAt: null,
+            refreshToken: null, // 手动 token 不支持 refresh
+          },
+        });
+      } else {
+        // 创建新 token
+        await this.prisma.token.create({
+          data: {
+            userId: user.id,
+            provider: 'canvas',
+            providerUserId: providerUserId ?? null,
+            accessToken,
+            refreshToken: null,
+            expiresAt: null, // 手动 token 长期有效
+          },
+        });
+      }
+
+      return user;
+    });
+
+    // 3. 生成 JWT token
+    const jwtToken = this.jwt.sign({ sub: meRes.id });
+    
+    return {
+      userId: meRes.id,
+      email: meRes.email,
+      name: meRes.name,
+      jwt: jwtToken,
+      message: '登录成功！使用手动生成的 Canvas Access Token',
+    };
   }
 
   async createTestUser() {
