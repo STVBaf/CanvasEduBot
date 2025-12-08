@@ -4,20 +4,26 @@ import { useRouter } from 'next/navigation';
 export default function LoginPage() {
   const router = useRouter();
 
-  const handleCanvasLogin = () => {
-    router.push('/callback?status=loading');//接后端OAuth
+  const handleEnterCourses = () => {
+    const token = localStorage.getItem('canvas_token');
+    if (!token) {
+      alert('未检测到Token，请先在首页保存');
+      router.push('/'); // 跳转到首页
+    } else {
+      router.push('/courses');
+    }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen py-12 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8 text-center">
-        <h2 className="text-3xl font-extrabold text-gray-900">猪头Canvas会不会遇上Agent学姐</h2>
-        <p className="mt-2 text-sm text-gray-600">通过 Canvas 账号登录，同步你的课程</p>
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50">
+      <div className="text-center space-y-4 w-96">
+        <h2 className="text-3xl font-bold">已保存 Token？</h2>
+        <p className="text-gray-600">点击按钮进入课程列表</p>
         <button
-          onClick={handleCanvasLogin}
-          className="w-full flex justify-center items-center px-4 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+          onClick={handleEnterCourses}
+          className="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 w-full"
         >
-          使用 Canvas 登录
+          进入课程列表
         </button>
       </div>
     </div>
