@@ -1,50 +1,37 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
+import type { Course } from '@/lib/types';
 
 export default function CoursesPage() {
-  const [courses, setCourses] = useState([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-
-  // 封装fetch请求工具，修改为实际后端接口地址（例如后端实际地址是https://canvas.sufe.edu.cn/api）
-  const request = async (url, method = 'GET', data = null) => {
-    const token = localStorage.getItem('canvas_token');
-    const options = {
-      method,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    };
-
-    if (data && method !== 'GET') {
-      options.body = JSON.stringify(data);
-    }
-
-    // 替换为后端实际的基础地址（根据后端提供的接口地址修改）
-    const response = await fetch(`https://canvas.sufe.edu.cn/api${url}`, options);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return response.json();
-  };
 
   useEffect(() => {
     const fetchCourses = async () => {
+      // 检查是否有token
+      const token = localStorage.getItem('canvas_token');
+      if (!token) {
+        setError('未检测到Token，请先保存Token');
+        setTimeout(() => router.push('/'), 2000);
+        return;
+      }
+
       setLoading(true);
       setError(null);
       try {
-        const data = await request('/v1/courses'); // 若后端接口路径有版本号（如/v1），需补充
+        const data = await api.getCourses();
         setCourses(data);
-      } catch (err) {
-        if (err.message.includes('401')) {
-          localStorage.removeItem('canvas_token');
+      } catch (err: any) {
+        const errorMessage = err.response?.data?.message || err.message || '未知错误';
+        if (err.response?.status === 401) {
           setError('Token已失效，请重新登录');
           setTimeout(() => router.push('/'), 2000);
         } else {
-          setError(`获取课程失败：${err.message}`);
+          setError(`获取课程失败：${errorMessage}`);
         }
       } finally {
         setLoading(false);
@@ -54,16 +41,17 @@ export default function CoursesPage() {
     fetchCourses();
   }, [router]);
 
-  const syncCourseFiles = async (courseId) => {
+  const syncCourseFiles = async (courseId: number) => {
     if (!confirm(`确定要同步课程ID: ${courseId}的文件吗？`)) return;
 
     try {
-      const data = await request(`/v1/files/sync?courseId=${courseId}`, 'POST'); // 补充接口版本号（如有）
+      const data = await api.syncCourseFiles(courseId);
       if (data.status === 'accepted') {
         alert('文件同步任务已触发，将在后台执行');
       }
-    } catch (err) {
-      alert(`同步失败：${err.message || '请重试'}`);
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.message || '请重试';
+      alert(`同步失败：${errorMessage}`);
     }
   };
 
