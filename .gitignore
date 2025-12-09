@@ -82,10 +82,10 @@ web/.env.*
 # -----------------------------
 # 数据库 / Prisma
 # -----------------------------
-prisma/dev.db
-prisma/dev.db-journal
-prisma/*.db
-prisma/*.db-journal
+server/prisma/dev.db
+server/prisma/dev.db-journal
+server/prisma/*.db
+server/prisma/*.db-journal
 
 # Prisma 生成的客户端（如希望忽略）
 # node_modules/@prisma/
