@@ -139,5 +139,24 @@ export class CanvasService {
 		});
 		return res.data;
 	}
+
+  //新增：获取作业 DDL 
+  async getAssignments(accessToken: string, courseId: string) {
+    const url = `${this.baseUrl}/api/v1/courses/${courseId}/assignments`;
+    try {
+      const res = await axios.get(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        params: { 
+          per_page: 50, 
+          order_by: 'due_at', // 按 DDL 排序
+          bucket: 'upcoming'  // 只看未来的作业
+        },
+      });
+      return res.data;
+    } catch (error) {
+      this.logger.error(`获取课程 ${courseId} 的作业失败`);
+      return [];
+    }
+  }
 }
 

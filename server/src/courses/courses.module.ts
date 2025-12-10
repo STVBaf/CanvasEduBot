@@ -4,10 +4,14 @@ import { CoursesService } from './courses.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { CanvasModule } from '../canvas/canvas.module';
 import { AuthModule } from '../auth/auth.module';
+import { AssignmentsController } from './assignments.controller';
 
 @Module({
   imports: [PrismaModule, CanvasModule, AuthModule],
-  controllers: [CoursesController],
+  controllers: [
+    CoursesController, 
+    AssignmentsController
+  ],
   providers: [CoursesService],
 })
 export class CoursesModule {}

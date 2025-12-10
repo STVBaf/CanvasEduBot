@@ -4,8 +4,6 @@ import { getActiveCourses, getCourseFiles } from './canvasClient'; // 引入你�
 
 const prisma = new PrismaClient();
 
-// ⚠️ 注意：这里假设我们要把数据关联到 ID 为 1 的用户
-// (也就是你之前用 script.ts 创建的那个测试用户)
 const TARGET_USER_ID = '1'; 
 
 async function main() {

@@ -34,15 +34,55 @@ model Token {
 }
 
 model FileMeta {
-	id           String   @id @default(cuid())
-	user         User     @relation(fields: [userId], references: [id])
-	userId       String
-	courseId     String
-	canvasFileId String   @unique
-	fileName     String
-	downloadUrl  String
-	localPath    String?
-	status       String   @default("pending")
-	createdAt    DateTime @default(now())
-	updatedAt    DateTime @updatedAt
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?     @relation(fields: [userId], references: [id])
+  courseId     String
+  course       Course   @relation(fields: [courseId], references: [id])
+  canvasFileId String   @unique 
+  fileName     String
+  downloadUrl  String   @db.Text 
+  localPath    String?
+  status       String   @default("pending")
+  fileType     String?  // pdf, docx
+  content      String?  @db.Text
+  summary      String?  @db.Text 
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  isProcessed Boolean @default(false)
 }
+
+model Course {
+  id          String       @id @default(uuid())
+  canvasId    String       @unique
+  name        String
+  courseCode  String?
+  
+  assignments Assignment[]
+  files       FileMeta[]
+  groups      Group[]
+}
+
+model Assignment {
+  id          String    @id @default(uuid())
+  canvasId    String    @unique
+  title       String
+  description String?   @db.Text 
+  dueAt       DateTime? // DDL
+  
+  courseId    String
+  course      Course    @relation(fields: [courseId], references: [id])
+  
+  createdAt   DateTime  @default(now())
+}
+
+model Group {
+  id        String   @id @default(uuid())
+  name      String   // 组名
+  members   String   @db.Text 
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id])
+  
+  createdAt DateTime @default(now())
+}
+
