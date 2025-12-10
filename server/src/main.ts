@@ -8,13 +8,17 @@ async function bootstrap() {
 	app.setGlobalPrefix('api');
 	
 	// 启用 CORS 支持前端调用
-	const allowedOrigins = [
-		'http://localhost:3000',
-		'http://localhost:3001', 
-		'http://localhost:3002',
-		'http://127.0.0.1:3000',
-		'http://127.0.0.1:3001',
-	];
+	const allowedOrigins = process.env.ALLOWED_ORIGINS 
+		? process.env.ALLOWED_ORIGINS.split(',')
+		: [
+			'http://localhost:3000',
+			'http://localhost:3001', 
+			'http://localhost:3002',
+			'http://127.0.0.1:3000',
+			'http://127.0.0.1:3001',
+		];
+	
+	logger.log(`CORS enabled for origins: ${allowedOrigins.join(', ')}`);
 	
 	app.enableCors({
 		origin: (origin, callback) => {
@@ -22,7 +26,8 @@ async function bootstrap() {
 			if (!origin || allowedOrigins.includes(origin)) {
 				callback(null, true);
 			} else {
-				callback(null, true); // 开发环境暂时允许所有
+				logger.warn(`CORS blocked origin: ${origin}`);
+				callback(new Error('Not allowed by CORS'));
 			}
 		},
 		credentials: true,
