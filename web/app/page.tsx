@@ -18,22 +18,25 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-50">
-      <div className="text-center space-y-4 w-96">
-        <h1 className="text-4xl font-bold text-gray-900">课程同步系统</h1>
-        <p className="text-gray-600">一键同步 Canvas 课程与作业</p>
+    <main className="flex min-h-screen items-center justify-center bg-background">
+      <div className="text-center space-y-6 w-96 p-8 bg-white rounded-3xl shadow-sm">
+        <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4">
+          C
+        </div>
+        <h1 className="text-3xl font-bold text-foreground">CanvasBot</h1>
+        <p className="text-muted-foreground">一键同步 Canvas 课程与作业</p>
         <input
           type="text"
           value={token}
           onChange={(e) => setToken(e.target.value)}
-          placeholder="请粘贴Canvas Access Token"
-          className="px-4 py-2 border rounded w-full mb-2"
+          placeholder="请粘贴 Canvas Access Token"
+          className="w-full px-4 py-3 bg-gray-50 border-none rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
         />
         <button
           onClick={saveToken}
-          className="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 w-full"
+          className="w-full px-6 py-4 bg-primary text-primary-foreground rounded-2xl font-bold hover:opacity-90 transition-opacity"
         >
-          保存Token
+          保存并继续
         </button>
       </div>
     </main>
