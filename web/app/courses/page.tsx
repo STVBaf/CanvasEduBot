@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import type { Course } from '@/lib/types';
+import Link from 'next/link'; 
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -81,7 +82,12 @@ export default function CoursesPage() {
               >
                 同步文件
               </button>
-              <button className="text-sm text-indigo-600 hover:underline">查看详情</button>
+              <Link 
+                href={`/courses/${course.id}`}
+                className="text-sm text-indigo-600 hover:underline"
+              >
+                查看详情
+              </Link>
             </div>
           </div>
         ))}
