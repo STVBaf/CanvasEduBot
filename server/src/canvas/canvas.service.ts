@@ -114,6 +114,8 @@ export class CanvasService {
 		const url = `${this.baseUrl}/api/v1/courses`;
 		const cleanToken = accessToken.trim();
 
+		this.logger.log(`正在从 Canvas 获取课程列表: ${url}`);
+
 		try {
 			const res = await axios.get(url, {
 				headers: { Authorization: `Bearer ${cleanToken}` },
@@ -121,14 +123,28 @@ export class CanvasService {
 					enrollment_state: 'active',  // 只获取激活的课程
 					per_page: 100,                // 每页100条（Canvas最大值）
 					include: ['term']             // 包含学期信息
-				}
+				},
+				timeout: 30000, // 30秒超时
 			});
-			this.logger.log(`Successfully fetched ${res.data.length} courses`);
+			this.logger.log(`成功获取 ${res.data.length} 门课程`);
 			return res.data;
 		} catch (error) {
 			if (axios.isAxiosError(error)) {
-				this.logger.error(`Failed to fetch courses: ${error.response?.status} - ${error.response?.data?.message || error.message}`);
+				if (error.code === 'ECONNREFUSED') {
+					this.logger.error(`无法连接到 Canvas 服务器: ${this.baseUrl}`);
+					throw new Error(`无法连接到 Canvas 服务器，请检查 CANVAS_BASE_URL 配置和网络连接`);
+				} else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+					this.logger.error(`连接 Canvas 超时: ${error.message}`);
+					throw new Error(`连接 Canvas 超时，请检查网络连接`);
+				} else if (error.response) {
+					this.logger.error(`Canvas API 错误: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
+					throw new Error(`Canvas API 错误: ${error.response.status} - ${error.response.data?.message || error.message}`);
+				} else {
+					this.logger.error(`请求失败: ${error.message}`);
+					throw new Error(`请求失败: ${error.message}`);
+				}
 			}
+			this.logger.error(`未知错误: ${error}`);
 			throw error;
 		}
 	}
