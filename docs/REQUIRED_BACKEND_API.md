@@ -23,13 +23,11 @@
 - **Endpoint:** `POST /api/files/sync?courseId=<COURSE_ID>`
 - **Description:** 触发后台任务，同步指定课程的文件结构。
 
-### 获取课程详情 (待实现)
-- **Endpoint:** `GET /api/courses/:id`
-- **Description:** 获取特定课程的详细信息。
+
 
 ## 2. 日程与作业 (Calendar & Assignments)
 
-### 获取即将截止的作业
+### 获取作业列表
 - **Endpoint:** `GET /api/assignments/upcoming`
 - **Description:** 获取未来 截止的作业列表。
 - **Response Example:**
@@ -63,21 +61,9 @@
   ]
   ```
 
-## 4. 知识库 (Knowledge Base)
 
-### 获取知识库统计
-- **Endpoint:** `GET /api/knowledge/stats`
-- **Description:** 获取用户个人知识库的统计数据。
-- **Response Example:**
-  ```json
-  {
-    "totalItems": 1248,
-    "weeklyGrowth": 12,
-    "syncProgress": 85
-  }
-  ```
 
-## 5. 用户信息 (User)
+## 4. 用户信息 (User)
 
 ### 获取当前用户信息
 - **Endpoint:** `GET /api/user/me`
