@@ -16,13 +16,25 @@ async function bootstrap() {
 		'http://127.0.0.1:3001',
 	];
 	
+	// 从环境变量读取额外的允许域名
+	const extraOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [];
+	const allOrigins = [...allowedOrigins, ...extraOrigins];
+	
 	app.enableCors({
 		origin: (origin, callback) => {
-			// 允许无 origin 的请求（如 Postman）或白名单中的请求
-			if (!origin || allowedOrigins.includes(origin)) {
+			// 允许无 origin 的请求（如 Postman、移动应用）
+			if (!origin) {
+				callback(null, true);
+				return;
+			}
+			
+			// 检查是否在白名单中
+			if (allOrigins.includes(origin)) {
 				callback(null, true);
 			} else {
-				callback(null, true); // 开发环境暂时允许所有
+				// 生产环境记录未授权的请求
+				logger.warn(`CORS blocked origin: ${origin}`);
+				callback(null, false);
 			}
 		},
 		credentials: true,
