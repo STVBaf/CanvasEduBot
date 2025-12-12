@@ -16,7 +16,7 @@ import {
 const navItems = [
   { name: '概览', href: '/dashboard', icon: LayoutDashboard },
   { name: '我的课程', href: '/dashboard/courses', icon: BookOpen },
-  { name: '日程安排', href: '/dashboard/calendar', icon: CalendarDays },
+  { name: '日程安排', href: '/dashboard/schedule', icon: CalendarDays },
   { name: '学习小组', href: '/dashboard/groups', icon: Users },
   { name: '知识库', href: '/dashboard/knowledge', icon: BrainCircuit },
 ];

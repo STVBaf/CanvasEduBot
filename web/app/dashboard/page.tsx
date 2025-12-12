@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BookOpen, Clock, Users, BrainCircuit, ArrowRight, MoreHorizontal, Calendar as CalendarIcon, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
-import type { Course } from '@/lib/types';
+import type { Course, StudyGroup } from '@/lib/types';
 
 // Helper to assign colors to courses
 const getCourseColor = (index: number) => {
@@ -27,29 +27,31 @@ const deadlines = [
   { id: 3, course: 'ENG105', task: '期中论文大纲', due: '周五 18:00', urgent: false },
 ];
 
-const groups = [
-  { id: 1, name: 'CS101 学习小组', members: 4, active: true },
-  { id: 2, name: '考研数学交流', members: 12, active: false },
-];
 
 export default function DashboardPage() {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [groups, setGroups] = useState<StudyGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<number | null>(null);
 
   useEffect(() => {
-    const fetchCourses = async () => {
+    const fetchData = async () => {
       try {
-        const data = await api.getCourses();
-        setCourses(data);
+        // 并行获取课程和小组数据
+        const [coursesData, groupsData] = await Promise.all([
+          api.getCourses(),
+          api.getGroups()
+        ]);
+        setCourses(coursesData);
+        setGroups(groupsData);
       } catch (error) {
-        console.error('Failed to fetch courses:', error);
+        console.error('Failed to fetch data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCourses();
+    fetchData();
   }, []);
 
   const handleSync = async (courseId: number, e: React.MouseEvent) => {
@@ -65,6 +67,8 @@ export default function DashboardPage() {
     }
   };
 
+  const myGroups = groups.filter(g => g.myRole !== 'none');
+
   const container = {
     hidden: { opacity: 0 },
     show: {
@@ -78,6 +82,12 @@ export default function DashboardPage() {
   const item = {
     hidden: { y: 20, opacity: 0 },
     show: { y: 0, opacity: 1 }
+  };
+
+  const getRoleBadge = (role: string) => {
+    if (role === 'leader') return <span className="text-[10px] bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-bold">组长</span>;
+    if (role === 'member') return <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">成员</span>;
+    return null;
   };
 
   return (
@@ -201,27 +211,44 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Study Groups */}
             <motion.div variants={item}>
-              <h2 className="text-xl font-bold mb-6">学习小组</h2>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold">学习小组</h2>
+                {/* 查看全部链接 */}
+                <Link href="/dashboard/groups" className="text-sm font-medium text-muted-foreground hover:text-primary flex items-center gap-1">
+                  查看全部 <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+              
               <div className="space-y-3">
-                {groups.map((group) => (
-                  <Card key={group.id} className="bg-white hover:bg-gray-50 transition-colors cursor-pointer">
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
-                          <Users className="w-5 h-5" />
+                {/* 动态渲染小组数据，只显示前3个 */}
+                {myGroups.slice(0, 3).map((group) => (
+                  <Link href="/dashboard/groups" key={group.id}>
+                    <Card className="bg-white hover:bg-gray-50 transition-colors cursor-pointer border-none shadow-sm">
+                      <CardContent className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${group.myRole !== 'none' ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 text-gray-400'}`}>
+                            <Users className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-sm text-gray-900">{group.name}</h4>
+                            <p className="text-xs text-muted-foreground">{group.memberCount} 位成员</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-bold text-sm">{group.name}</h4>
-                          <p className="text-xs text-muted-foreground">{group.members} 位成员</p>
+                        <div className="flex items-center gap-2">
+                          {getRoleBadge(group.myRole)}
+                          {group.myRole !== 'none' && <span className="w-2 h-2 rounded-full bg-green-500"></span>}
                         </div>
-                      </div>
-                      {group.active && <span className="w-2 h-2 rounded-full bg-green-500"></span>}
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  </Link>
                 ))}
-                <button className="w-full py-3 border-2 border-dashed border-gray-200 rounded-3xl text-sm font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2">
-                  <span>+</span> 创建新小组
-                </button>
+
+                {myGroups.length === 0 && !loading && (
+                  <div className="text-center py-8 text-gray-400 text-sm bg-white rounded-2xl">
+                    暂未加入任何小组
+                  </div>
+                )}
+                
               </div>
             </motion.div>
 
