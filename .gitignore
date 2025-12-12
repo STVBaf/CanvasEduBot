@@ -1,0 +1,124 @@
+# -----------------------------
+# OS / 编辑器相关文件
+# -----------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# VSCode / IDE
+.vscode/
+.idea/
+*.iml
+
+# -----------------------------
+# Node / pnpm / yarn / npm
+# -----------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+
+# -----------------------------
+# 通用构建产物
+# -----------------------------
+dist/
+build/
+.cache/
+*.tsbuildinfo
+
+# -----------------------------
+# 前端：Next.js (web/)
+# -----------------------------
+.next/
+web/.next/
+web/out/
+web/.vercel/
+web/.eslintcache
+
+# 静态产物缓存
+web/.turbo/
+
+# -----------------------------
+# 后端：NestJS (server/)
+# -----------------------------
+server/dist/
+server/.husky/_/
+server/.eslintcache
+server/files/
+
+# -----------------------------
+# 日志文件
+# -----------------------------
+logs/
+*.log
+log-*.txt
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# -----------------------------
+# 环境变量 / 配置文件（本地）
+# -----------------------------
+.env
+.env.*
+!.env.example
+
+server/.env
+server/.env.*
+!server/.env.example
+
+web/.env
+web/.env.*
+!web/.env.example
+
+# -----------------------------
+# 数据库 / Prisma
+# -----------------------------
+<<<<<<< HEAD
+prisma/dev.db
+prisma/dev.db-journal
+prisma/*.db
+prisma/*.db-journal
+=======
+server/prisma/dev.db
+server/prisma/dev.db-journal
+server/prisma/*.db
+server/prisma/*.db-journal
+>>>>>>> 912218083e6d5db2086272c75935fd422a011ff4
+
+# Prisma 生成的客户端（如希望忽略）
+# node_modules/@prisma/
+
+# -----------------------------
+# 测试 / 覆盖率
+# -----------------------------
+coverage/
+.nyc_output/
+test-output/
+jest-html-reporters-*.html
+jest-*.xml
+
+# -----------------------------
+# 临时文件与打包文件
+# -----------------------------
+*.tgz
+*.gz
+*.zip
+*.rar
+*.7z
+
+# -----------------------------
+# 运行时文件
+# -----------------------------
+.pids
+*.pid
+*.seed
+*.pid.lock

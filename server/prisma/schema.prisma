@@ -1,0 +1,148 @@
+datasource db {
+	provider = "mysql"
+	url      = env("DATABASE_URL")
+}
+
+generator client {
+	provider = "prisma-client-js"
+}
+
+model User {
+	id        String   @id @default(cuid())
+	email     String   @unique
+	name      String?
+<<<<<<< HEAD
+=======
+	avatar    String?  // 用户头像 URL
+	canvasId  String?  // Canvas 用户 ID
+>>>>>>> 912218083e6d5db2086272c75935fd422a011ff4
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+	tokens    Token[]
+	files     FileMeta[]
+<<<<<<< HEAD
+=======
+	groupMemberships GroupMember[]  // 用户加入的小组
+	createdGroups    Group[]        // 用户创建的小组
+>>>>>>> 912218083e6d5db2086272c75935fd422a011ff4
+}
+
+model Token {
+	id             String   @id @default(cuid())
+	user           User     @relation(fields: [userId], references: [id])
+	userId         String
+	provider       String
+	providerUserId String?  
+	accessToken    String
+	refreshToken   String?
+	expiresAt      DateTime?
+	scope          String?
+	createdAt      DateTime @default(now())
+	updatedAt      DateTime @updatedAt
+	// Ensure uniqueness of provider + providerUserId when present
+	@@unique([provider, providerUserId])
+}
+
+model FileMeta {
+<<<<<<< HEAD
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?     @relation(fields: [userId], references: [id])
+  courseId     String
+  course       Course   @relation(fields: [courseId], references: [id])
+  canvasFileId String   @unique 
+  fileName     String
+  downloadUrl  String   @db.Text 
+  localPath    String?
+  status       String   @default("pending")
+  fileType     String?  // pdf, docx
+  content      String?  @db.Text
+  summary      String?  @db.Text 
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  isProcessed Boolean @default(false)
+}
+
+model Course {
+  id          String       @id @default(uuid())
+  canvasId    String       @unique
+  name        String
+  courseCode  String?
+  
+  assignments Assignment[]
+  files       FileMeta[]
+  groups      Group[]
+}
+
+model Assignment {
+  id          String    @id @default(uuid())
+  canvasId    String    @unique
+  title       String
+  description String?   @db.Text 
+  dueAt       DateTime? // DDL
+  
+  courseId    String
+  course      Course    @relation(fields: [courseId], references: [id])
+  
+  createdAt   DateTime  @default(now())
+}
+
+model Group {
+  id        String   @id @default(uuid())
+  name      String   // 组名
+  members   String   @db.Text 
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id])
+  
+  createdAt DateTime @default(now())
+}
+
+=======
+	id           String   @id @default(cuid())
+	user         User     @relation(fields: [userId], references: [id])
+	userId       String
+	courseId     String
+	canvasFileId String   @unique
+	fileName     String
+	fileSize     Int?     // 文件大小（字节）
+	contentType  String?  // 文件类型
+	downloadUrl  String
+	localPath    String?
+	status       String   @default("pending")
+	createdAt    DateTime @default(now())
+	updatedAt    DateTime @updatedAt
+}
+
+// 课程小组模型
+model Group {
+	id          String   @id @default(cuid())
+	courseId    String   // 所属课程 ID
+	courseName  String?  // 课程名称（冗余字段，便于查询）
+	name        String   // 小组名称
+	description String?  // 小组描述
+	creator     User     @relation(fields: [creatorId], references: [id])
+	creatorId   String   // 创建者 ID
+	isActive    Boolean  @default(true)  // 是否活跃
+	createdAt   DateTime @default(now())
+	updatedAt   DateTime @updatedAt
+	members     GroupMember[]  // 小组成员
+	
+	@@index([courseId])
+	@@index([creatorId])
+}
+
+// 小组成员模型
+model GroupMember {
+	id        String   @id @default(cuid())
+	group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+	groupId   String
+	user      User     @relation(fields: [userId], references: [id])
+	userId    String
+	role      String   @default("member")  // 角色：creator, admin, member
+	joinedAt  DateTime @default(now())
+	
+	@@unique([groupId, userId])  // 同一用户不能重复加入同一小组
+	@@index([groupId])
+	@@index([userId])
+}
+>>>>>>> 912218083e6d5db2086272c75935fd422a011ff4

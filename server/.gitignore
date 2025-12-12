@@ -1,0 +1,10 @@
+node_modules
+# Keep environment variables out of version control
+.env
+
+/generated/prisma
+
+# 测试脚本（包含敏感 Token）
+test-api.js
+test-sync.js
+check-files.js
