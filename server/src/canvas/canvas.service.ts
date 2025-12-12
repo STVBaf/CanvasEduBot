@@ -18,7 +18,13 @@ export class CanvasService {
 		const res = await axios.get(`${this.baseUrl}/api/v1/users/self`, {
 			headers: { Authorization: `Bearer ${accessToken}` },
 		});
-		return res.data as { id?: string; name?: string; primary_email?: string; login_id?: string };
+		return res.data as { 
+			id?: string; 
+			name?: string; 
+			primary_email?: string; 
+			login_id?: string;
+			avatar_url?: string;
+		};
 	}
 
 	getAuthorizeUrl(state: string) {
@@ -149,11 +155,143 @@ export class CanvasService {
 		}
 	}
 
+	/**
+	 * 获取课程文件列表（直接从 Canvas 获取，不存储到数据库）
+	 */
 	async getCourseFiles(accessToken: string, courseId: string) {
-		const res = await axios.get(`${this.baseUrl}/api/v1/courses/${courseId}/files`, {
-			headers: { Authorization: `Bearer ${accessToken}` },
-		});
-		return res.data;
+		const cleanToken = accessToken.trim();
+		
+		try {
+			const res = await axios.get(`${this.baseUrl}/api/v1/courses/${courseId}/files`, {
+				headers: { Authorization: `Bearer ${cleanToken}` },
+				params: {
+					per_page: 100,  // 每页100个文件
+					sort: 'created_at',
+					order: 'desc',
+				}
+			});
+			
+			this.logger.log(`Successfully fetched ${res.data.length} files from course ${courseId}`);
+			return res.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				this.logger.error(`Failed to fetch course files: ${error.response?.status} - ${error.message}`);
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * 获取单个文件的详细信息
+	 */
+	async getFileInfo(accessToken: string, fileId: string) {
+		const cleanToken = accessToken.trim();
+		
+		try {
+			const res = await axios.get(`${this.baseUrl}/api/v1/files/${fileId}`, {
+				headers: { Authorization: `Bearer ${cleanToken}` },
+			});
+			return res.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				this.logger.error(`Failed to fetch file info: ${error.response?.status} - ${error.message}`);
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * 下载文件内容
+	 */
+	async downloadFile(accessToken: string, fileUrl: string): Promise<Buffer> {
+		const cleanToken = accessToken.trim();
+		
+		try {
+			const res = await axios.get(fileUrl, {
+				headers: { Authorization: `Bearer ${cleanToken}` },
+				responseType: 'arraybuffer',  // 获取二进制数据
+			});
+			return Buffer.from(res.data);
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				this.logger.error(`Failed to download file: ${error.response?.status} - ${error.message}`);
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * 获取课程的作业列表
+	 */
+	async getCourseAssignments(accessToken: string, courseId: string) {
+		const cleanToken = accessToken.trim();
+		
+		try {
+			const res = await axios.get(`${this.baseUrl}/api/v1/courses/${courseId}/assignments`, {
+				headers: { Authorization: `Bearer ${cleanToken}` },
+				params: {
+					per_page: 100,
+					order_by: 'due_at',
+					include: ['submission']  // 包含提交状态
+				}
+			});
+			
+			this.logger.log(`Successfully fetched ${res.data.length} assignments from course ${courseId}`);
+			return res.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				this.logger.error(`Failed to fetch assignments: ${error.response?.status} - ${error.message}`);
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * 获取即将到期的作业（所有课程）
+	 */
+	async getUpcomingAssignments(accessToken: string) {
+		const cleanToken = accessToken.trim();
+		
+		try {
+			const res = await axios.get(`${this.baseUrl}/api/v1/users/self/upcoming_events`, {
+				headers: { Authorization: `Bearer ${cleanToken}` },
+			});
+			
+			// 过滤出作业类型的事件
+			const assignments = res.data.filter((event: any) => event.type === 'assignment');
+			this.logger.log(`Successfully fetched ${assignments.length} upcoming assignments`);
+			return assignments;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				this.logger.error(`Failed to fetch upcoming assignments: ${error.response?.status} - ${error.message}`);
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * 获取单个作业的详细信息
+	 */
+	async getAssignmentDetail(accessToken: string, courseId: string, assignmentId: string) {
+		const cleanToken = accessToken.trim();
+		
+		try {
+			const res = await axios.get(
+				`${this.baseUrl}/api/v1/courses/${courseId}/assignments/${assignmentId}`,
+				{
+					headers: { Authorization: `Bearer ${cleanToken}` },
+					params: {
+						include: ['submission']
+					}
+				}
+			);
+			return res.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				this.logger.error(`Failed to fetch assignment detail: ${error.response?.status} - ${error.message}`);
+			}
+			throw error;
+		}
 	}
 }
 

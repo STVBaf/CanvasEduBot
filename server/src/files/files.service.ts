@@ -46,6 +46,8 @@ export class FilesService {
           fileName: f.display_name ?? f.filename,
           downloadUrl: f.url,
           courseId: String(courseId),
+          fileSize: f.size ?? null,
+          contentType: f.content_type ?? null,
         },
         create: {
           userId,
@@ -53,6 +55,8 @@ export class FilesService {
           canvasFileId: String(f.id),
           fileName: f.display_name ?? f.filename,
           downloadUrl: f.url,
+          fileSize: f.size ?? null,
+          contentType: f.content_type ?? null,
         },
       });
 
@@ -60,5 +64,108 @@ export class FilesService {
         fileMetaId: fileMeta.id,
       });
     }
+  }
+
+  /**
+   * 获取指定课程的文件列表（直接从 Canvas 获取，不存数据库）
+   */
+  async getCourseFilesFromCanvas(accessToken: string, courseId: string) {
+    const files = await this.canvas.getCourseFiles(accessToken, courseId);
+    
+    // 格式化返回数据
+    return files.map((file: any) => ({
+      id: file.id,
+      displayName: file.display_name,
+      fileName: file.filename,
+      size: file.size,
+      contentType: file['content-type'] || file.content_type,
+      url: file.url,
+      createdAt: file.created_at,
+      updatedAt: file.updated_at,
+      modifiedAt: file.modified_at,
+      locked: file.locked || false,
+      hidden: file.hidden || false,
+      thumbnailUrl: file.thumbnail_url,
+    }));
+  }
+
+  /**
+   * 下载单个文件
+   */
+  async downloadSingleFile(accessToken: string, fileId: string) {
+    // 1. 获取文件信息
+    const fileInfo = await this.canvas.getFileInfo(accessToken, fileId);
+    
+    // 2. 下载文件内容
+    const fileBuffer = await this.canvas.downloadFile(accessToken, fileInfo.url);
+    
+    return {
+      buffer: fileBuffer,
+      fileName: fileInfo.display_name || fileInfo.filename,
+      contentType: fileInfo['content-type'] || fileInfo.content_type,
+      size: fileInfo.size,
+    };
+  }
+
+  /**
+   * 获取指定课程的文件列表（从数据库获取已同步的文件）
+   */
+  async getCourseFiles(accessToken: string, courseId: string) {
+    // 1. 获取用户信息
+    const profile = await this.canvas.getUserProfile(accessToken);
+    const email = profile.primary_email || profile.login_id || `canvas_user_${profile.id}@example.com`;
+    
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return [];
+    }
+
+    // 2. 查询该课程的文件
+    const files = await this.prisma.fileMeta.findMany({
+      where: {
+        userId: user.id,
+        courseId: String(courseId),
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        canvasFileId: true,
+        fileName: true,
+        fileSize: true,
+        contentType: true,
+        downloadUrl: true,
+        localPath: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      }
+    });
+
+    return files;
+  }
+
+  /**
+   * 获取文件详情
+   */
+  async getFileDetail(fileId: string, accessToken: string) {
+    // 验证用户
+    const profile = await this.canvas.getUserProfile(accessToken);
+    const email = profile.primary_email || profile.login_id || `canvas_user_${profile.id}@example.com`;
+    
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return null;
+    }
+
+    const file = await this.prisma.fileMeta.findFirst({
+      where: {
+        id: fileId,
+        userId: user.id,
+      },
+    });
+
+    return file;
   }
 }
