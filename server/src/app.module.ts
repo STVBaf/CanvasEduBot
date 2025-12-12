@@ -10,6 +10,7 @@ import { UserModule } from './user/user.module';
 import { GroupsModule } from './groups/groups.module';
 import { AssignmentsModule } from './assignments/assignments.module';
 import { FilesProcessor } from './files/files.processor';
+import { AgentService } from './agent/agent.service';
 
 @Module({
 	imports: [
@@ -24,7 +25,7 @@ import { FilesProcessor } from './files/files.processor';
 		GroupsModule,
 		AssignmentsModule,
 	],
-	providers: [FilesProcessor],
+	providers: [FilesProcessor,AgentService],
 })
 export class AppModule {}
 
