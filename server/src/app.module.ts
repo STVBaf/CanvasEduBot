@@ -6,6 +6,9 @@ import { CanvasModule } from './canvas/canvas.module';
 import { CoursesModule } from './courses/courses.module';
 import { FilesModule } from './files/files.module';
 import { QueueModule } from './queue/queue.module';
+import { UserModule } from './user/user.module';
+import { GroupsModule } from './groups/groups.module';
+import { AssignmentsModule } from './assignments/assignments.module';
 import { FilesProcessor } from './files/files.processor';
 
 @Module({
@@ -17,6 +20,9 @@ import { FilesProcessor } from './files/files.processor';
 		CanvasModule,
 		CoursesModule,
 		FilesModule,
+		UserModule,
+		GroupsModule,
+		AssignmentsModule,
 	],
 	providers: [FilesProcessor],
 })

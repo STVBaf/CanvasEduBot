@@ -11,10 +11,14 @@ model User {
 	id        String   @id @default(cuid())
 	email     String   @unique
 	name      String?
+	avatar    String?  // 用户头像 URL
+	canvasId  String?  // Canvas 用户 ID
 	createdAt DateTime @default(now())
 	updatedAt DateTime @updatedAt
 	tokens    Token[]
 	files     FileMeta[]
+	groupMemberships GroupMember[]  // 用户加入的小组
+	createdGroups    Group[]        // 用户创建的小组
 }
 
 model Token {
@@ -40,9 +44,44 @@ model FileMeta {
 	courseId     String
 	canvasFileId String   @unique
 	fileName     String
+	fileSize     Int?     // 文件大小（字节）
+	contentType  String?  // 文件类型
 	downloadUrl  String
 	localPath    String?
 	status       String   @default("pending")
 	createdAt    DateTime @default(now())
 	updatedAt    DateTime @updatedAt
+}
+
+// 课程小组模型
+model Group {
+	id          String   @id @default(cuid())
+	courseId    String   // 所属课程 ID
+	courseName  String?  // 课程名称（冗余字段，便于查询）
+	name        String   // 小组名称
+	description String?  // 小组描述
+	creator     User     @relation(fields: [creatorId], references: [id])
+	creatorId   String   // 创建者 ID
+	isActive    Boolean  @default(true)  // 是否活跃
+	createdAt   DateTime @default(now())
+	updatedAt   DateTime @updatedAt
+	members     GroupMember[]  // 小组成员
+	
+	@@index([courseId])
+	@@index([creatorId])
+}
+
+// 小组成员模型
+model GroupMember {
+	id        String   @id @default(cuid())
+	group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+	groupId   String
+	user      User     @relation(fields: [userId], references: [id])
+	userId    String
+	role      String   @default("member")  // 角色：creator, admin, member
+	joinedAt  DateTime @default(now())
+	
+	@@unique([groupId, userId])  // 同一用户不能重复加入同一小组
+	@@index([groupId])
+	@@index([userId])
 }
