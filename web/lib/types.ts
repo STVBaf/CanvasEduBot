@@ -15,3 +15,10 @@ export interface ApiError {
   message: string;
   statusCode?: number;
 }
+
+export interface FileMeta {
+  id: number;
+  fileName: string;
+  downloadUrl: string;
+  createdAt: string;
+}

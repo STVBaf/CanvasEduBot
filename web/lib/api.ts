@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import type { Course, SyncResponse } from './types';
+import type { Course, SyncResponse, FileMeta } from './types';
 
 // 从环境变量获取API地址，如果没有则使用默认值
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000/api';
@@ -50,6 +50,16 @@ export const api = {
   getCourses: async (): Promise<Course[]> => {
     const response = await apiClient.get<Course[]>('/courses');
     return response.data;
+  },
+
+  /**
+   * 获取课程文件列表
+   * @param courseId 课程ID
+   */
+  getCourseFiles: async (courseId: number): Promise<FileMeta[]> => {
+    // TODO: 待后端实现 GET /files?courseId=xxx 接口
+    // 目前返回空数组以防止报错
+    return [];
   },
 
   /**

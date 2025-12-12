@@ -1,17 +1,23 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function Home() {
   const [token, setToken] = useState('');
   const router = useRouter();
 
+  useEffect(() => {
+    const storedToken = localStorage.getItem('canvas_token');
+    if (storedToken) {
+      router.push('/dashboard');
+    }
+  }, [router]);
+
   const saveToken = () => {
     const trimmedToken = token.trim();
     if (trimmedToken && trimmedToken.length > 20) {
       localStorage.setItem('canvas_token', trimmedToken);
-      alert('Token已保存！即将进入课程列表确认页');
-      router.push('/login'); // 保存后跳转到登录确认页
+      router.push('/dashboard'); // 保存后直接跳转到仪表盘
     } else {
       alert('请输入有效的Canvas Access Token（长度需大于20字符）');
     }

@@ -90,7 +90,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">你好, 同学! 👋</h1>
+          <h1 className="text-3xl font-bold text-foreground">你好, 同学! </h1>
           <p className="text-muted-foreground mt-1">准备好开始今天的学习了吗？</p>
         </div>
         <div className="flex gap-4">
@@ -316,9 +316,9 @@ export default function DashboardPage() {
                 <CardContent className="p-6 relative">
                   <h3 className="text-lg font-bold mb-2">专注模式</h3>
                   <p className="text-gray-400 text-sm mb-4">开启番茄钟，专注于当前的学习任务。</p>
-                  <button className="w-full py-2 bg-white text-black rounded-xl font-bold text-sm hover:bg-gray-200 transition-colors">
+                  <Link href="/dashboard/focus" className="block w-full py-2 bg-white text-black rounded-xl font-bold text-sm hover:bg-gray-200 transition-colors text-center">
                     开始专注
-                  </button>
+                  </Link>
                   <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
                 </CardContent>
              </Card>
