@@ -28,9 +28,8 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
       >
         <main className="flex-grow">{children}</main>
-        {/* 新增全局页脚 */}
         <footer className="border-t py-4 px-6 text-center text-sm text-gray-500">
-          © 猪头Canvas会不会遇上Agent学姐 软件工程作业 | 基于 Canvas 开发
+          © 猪头Canvas会不会遇上Agent学姐 | 基于 Canvas 开发
         </footer>
       </body>
     </html>
