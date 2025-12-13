@@ -39,8 +39,7 @@ export default function DashboardPage() {
     };
     fetchData();
   }, []);
-
-  // ✅ 使用与 courses page 完全一致的学期格式化函数
+  
   const formatTerm = (startAt: string | null): string => {
     if (!startAt) return '未知学期';
     try {
