@@ -2,128 +2,110 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Users, Plus, LogOut, Trash2, Search, BookOpen, X, Loader2, UserPlus } from 'lucide-react';
+import { Users, Plus, LogOut, Trash2, BookOpen, X, Loader2, UserPlus } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { StudyGroup, Course } from '@/lib/types';
 
 export default function GroupsPage() {
-  // --- 状态管理 ---
   const [groups, setGroups] = useState<StudyGroup[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // 模态框状态
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   
-  // 创建小组表单状态
   const [newGroupName, setNewGroupName] = useState('');
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   const [isCreating, setIsCreating] = useState(false);
 
-  // 操作确认状态
   const [actionType, setActionType] = useState<'leave' | 'disband' | 'join' | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<StudyGroup | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
-  // --- 初始化数据 ---
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
+    setLoading(true);
     try {
       const [groupsData, coursesData] = await Promise.all([
         api.getGroups(),
         api.getCourses()
       ]);
-      setGroups(groupsData);
-      setCourses(coursesData);
+      // 增加安全检查，确保返回的是数组
+      setGroups(Array.isArray(groupsData) ? groupsData : []);
+      setCourses(Array.isArray(coursesData) ? coursesData : []);
     } catch (error) {
       console.error('Failed to fetch data:', error);
+      setGroups([]); // 出错时也设置为空数组
     } finally {
       setLoading(false);
     }
   };
 
-  // --- 辅助逻辑：计算用户已经加入小组的课程ID列表 ---
-  const joinedCourseIds = groups
-    .filter(g => g.myRole !== 'none')
-    .map(g => g.courseId);
+  const joinedCourseIds = groups.map(g => g.courseId);
 
-  // --- 动作处理 ---
-
-  // 打开创建弹窗
   const openCreateModal = () => {
     setNewGroupName('');
     setSelectedCourseId('');
     setIsCreateModalOpen(true);
   };
 
-  // 提交创建
   const handleCreateGroup = async () => {
     if (!newGroupName || !selectedCourseId) return;
     setIsCreating(true);
     try {
+      const selectedCourse = courses.find(c => String(c.id) === selectedCourseId);
+      if (!selectedCourse) throw new Error("Selected course not found");
+
       await api.createGroup({
         name: newGroupName,
-        courseId: parseInt(selectedCourseId)
+        courseId: selectedCourseId,
+        courseName: selectedCourse.name,
+        description: 'Created via CanvasBot'
       });
-      await fetchData(); // 刷新列表
+      await fetchData();
       setIsCreateModalOpen(false);
     } catch (error: any) {
-      alert(error.message || '创建失败');
+      alert(error.response?.data?.message || '创建失败');
     } finally {
       setIsCreating(false);
     }
   };
 
-  // 打开确认弹窗 (退出/解散/加入)
   const openConfirmModal = (group: StudyGroup, type: 'leave' | 'disband' | 'join') => {
-    // 🔴 关键检查：如果是加入操作，检查是否已经在该课程的其他组里
-    if (type === 'join') {
-      if (joinedCourseIds.includes(group.courseId)) {
-        alert(`您已经加入了该课程 (${group.courseName}) 的另一个小组，无法加入此组。`);
-        return;
-      }
+    if (type === 'join' && joinedCourseIds.includes(group.courseId)) {
+      alert(`您已经加入了该课程 (${group.courseName}) 的另一个小组，无法加入此组。`);
+      return;
     }
-
     setSelectedGroup(group);
     setActionType(type);
     setIsConfirmModalOpen(true);
   };
 
-  // 执行确认操作
   const handleConfirmAction = async () => {
     if (!selectedGroup || !actionType) return;
     setIsActionLoading(true);
     try {
-      if (actionType === 'leave') {
-        await api.leaveGroup(selectedGroup.id);
-      } else if (actionType === 'disband') {
-        await api.disbandGroup(selectedGroup.id);
-      } else if (actionType === 'join') {
-        await api.joinGroup(selectedGroup.id);
-      }
-      await fetchData(); // 刷新列表
+      if (actionType === 'leave') await api.leaveGroup(selectedGroup.id);
+      else if (actionType === 'disband') await api.disbandGroup(selectedGroup.id);
+      else if (actionType === 'join') await api.joinGroup(selectedGroup.id);
+      await fetchData();
       setIsConfirmModalOpen(false);
     } catch (error: any) {
-      alert(error.message || '操作失败');
+      alert(error.response?.data?.message || '操作失败');
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  // --- 辅助渲染 ---
-  const getRoleBadge = (role: string) => {
-    if (role === 'leader') return <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full font-bold">组长</span>;
-    if (role === 'member') return <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-bold">成员</span>;
+  const getRoleBadge = (group: StudyGroup) => {
+    if (group.isCreator) return <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full font-bold">组长</span>;
+    if (group.isMember) return <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-bold">成员</span>;
     return null;
   };
 
   return (
     <div className="space-y-8 relative">
-      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground">学习小组</h1>
@@ -137,184 +119,89 @@ export default function GroupsPage() {
         </button>
       </div>
 
-      {/* Content */}
+      {/* 空状态判断 */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[1, 2, 3].map(i => <div key={i} className="h-40 bg-gray-100 rounded-3xl animate-pulse" />)}
-        </div>
-      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">{[1, 2, 3].map(i => <div key={i} className="h-40 bg-gray-100 rounded-3xl animate-pulse" />)}</div>
+      ) : groups.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {groups.map((group) => (
             <Card key={group.id} className="group hover:shadow-lg transition-all duration-300 border-none rounded-[2rem] overflow-hidden bg-white">
               <CardContent className="p-6 flex flex-col h-full">
-                {/* Header */}
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${group.myRole !== 'none' ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-500'}`}>
-                      <Users className="w-6 h-6" />
-                    </div>
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl bg-indigo-100 text-indigo-600"><Users className="w-6 h-6" /></div>
                     <div>
                       <h3 className="font-bold text-lg text-gray-900 line-clamp-1">{group.name}</h3>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                        <BookOpen className="w-3 h-3" />
-                        <span className="line-clamp-1">{group.courseName}</span>
-                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1"><BookOpen className="w-3 h-3" /><span className="line-clamp-1">{group.courseName}</span></div>
                     </div>
                   </div>
-                  {getRoleBadge(group.myRole)}
+                  {getRoleBadge(group)}
                 </div>
-
-                {/* Members Info */}
                 <div className="space-y-3 mb-6 flex-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">成员 ({group.memberCount}/{group.maxMembers})</span>
-                    <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-indigo-500 rounded-full" 
-                        style={{ width: `${(group.memberCount / group.maxMembers) * 100}%` }}
-                      />
-                    </div>
-                  </div>
+                  <div className="flex items-center justify-between text-sm"><span className="text-gray-500">成员 ({group.memberCount})</span></div>
                   <div className="flex flex-wrap gap-2">
-                    {group.members?.slice(0, 4).map((member, idx) => (
-                      <span key={idx} className="text-xs bg-gray-50 text-gray-600 px-2 py-1 rounded-lg">
-                        {member}
-                      </span>
-                    ))}
-                    {(group.members?.length || 0) > 4 && (
-                      <span className="text-xs text-gray-400 px-1 py-1">...</span>
-                    )}
+                    {group.members?.slice(0, 4).map((member) => <span key={member.id} className="text-xs bg-gray-50 text-gray-600 px-2 py-1 rounded-lg">{member.user.name}</span>)}
+                    {(group.members?.length || 0) > 4 && <span className="text-xs text-gray-400 px-1 py-1">...</span>}
                   </div>
                 </div>
-
-                {/* Actions */}
                 <div className="pt-4 border-t border-gray-100 flex gap-2">
-                  {group.myRole === 'leader' ? (
-                    <button 
-                      onClick={() => openConfirmModal(group, 'disband')}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-50 text-red-600 text-sm font-bold hover:bg-red-100 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" /> 解散小组
-                    </button>
-                  ) : group.myRole === 'member' ? (
-                    <button 
-                      onClick={() => openConfirmModal(group, 'leave')}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-orange-50 text-orange-600 text-sm font-bold hover:bg-orange-100 transition-colors"
-                    >
-                      <LogOut className="w-4 h-4" /> 退出小组
-                    </button>
+                  {group.isCreator ? (
+                    <button onClick={() => openConfirmModal(group, 'disband')} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-50 text-red-600 text-sm font-bold hover:bg-red-100 transition-colors"><Trash2 className="w-4 h-4" /> 解散小组</button>
+                  ) : group.isMember ? (
+                    <button onClick={() => openConfirmModal(group, 'leave')} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-orange-50 text-orange-600 text-sm font-bold hover:bg-orange-100 transition-colors"><LogOut className="w-4 h-4" /> 退出小组</button>
                   ) : (
-                    <button 
-                      onClick={() => openConfirmModal(group, 'join')}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-colors
-                        ${joinedCourseIds.includes(group.courseId) 
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                          : 'bg-black text-white hover:bg-gray-800'
-                        }
-                      `}
-                    >
-                      <UserPlus className="w-4 h-4" /> 加入小组
-                    </button>
+                    <button onClick={() => openConfirmModal(group, 'join')} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-colors bg-black text-white hover:bg-gray-800"><UserPlus className="w-4 h-4" /> 加入小组</button>
                   )}
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
+      ) : (
+        <div className="text-center py-20 text-muted-foreground">
+          <p>暂无小组信息</p>
+          <p className="mt-2 text-sm">点击右上角的“创建新小组”按钮来创建一个吧！</p>
+        </div>
       )}
 
-      {/* === 创建小组弹窗 === */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold">创建新小组</h3>
-              <button onClick={() => setIsCreateModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
+              <button onClick={() => setIsCreateModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-500" /></button>
             </div>
-            
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">小组名称</label>
-                <input 
-                  type="text" 
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                  placeholder="例如：CS101 期末突击队"
-                  className="w-full px-4 py-3 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                />
+                <input type="text" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="例如：CS101 期末突击队" className="w-full px-4 py-3 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-primary/20 outline-none transition-all" />
               </div>
-              
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">所属课程</label>
-                <select 
-                  value={selectedCourseId}
-                  onChange={(e) => setSelectedCourseId(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer appearance-none"
-                >
+                <select value={selectedCourseId} onChange={(e) => setSelectedCourseId(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer appearance-none">
                   <option value="" disabled>选择课程...</option>
                   {courses.map(course => {
-                    // 🔴 关键检查：如果已经加入了该课程的小组，则禁用该选项
-                    const isJoined = joinedCourseIds.includes(course.id);
-                    return (
-                      <option key={course.id} value={course.id} disabled={isJoined} className={isJoined ? 'text-gray-400' : ''}>
-                        {course.name} ({course.course_code}) {isJoined ? '- 已有小组' : ''}
-                      </option>
-                    );
+                    const isJoined = joinedCourseIds.includes(String(course.id));
+                    return <option key={course.id} value={course.id} disabled={isJoined} className={isJoined ? 'text-gray-400' : ''}>{course.name} ({course.course_code}) {isJoined ? '- 已有小组' : ''}</option>;
                   })}
                 </select>
               </div>
             </div>
-
             <div className="mt-8 flex gap-3">
-              <button 
-                onClick={() => setIsCreateModalOpen(false)}
-                className="flex-1 py-3 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors"
-              >
-                取消
-              </button>
-              <button 
-                onClick={handleCreateGroup}
-                disabled={!newGroupName || !selectedCourseId || isCreating}
-                className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {isCreating ? <Loader2 className="w-5 h-5 animate-spin" /> : '确认创建'}
-              </button>
+              <button onClick={() => setIsCreateModalOpen(false)} className="flex-1 py-3 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">取消</button>
+              <button onClick={handleCreateGroup} disabled={!newGroupName || !selectedCourseId || isCreating} className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">{isCreating ? <Loader2 className="w-5 h-5 animate-spin" /> : '确认创建'}</button>
             </div>
           </div>
         </div>
       )}
-
-      {/* === 操作确认弹窗 === */}
       {isConfirmModalOpen && selectedGroup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in-95">
-            <h3 className="text-xl font-bold mb-2">
-              {actionType === 'leave' ? '退出小组' : actionType === 'disband' ? '解散小组' : '加入小组'}
-            </h3>
-            <p className="text-gray-500 mb-6">
-              {actionType === 'leave' && `确定要退出 "${selectedGroup.name}" 吗？`}
-              {actionType === 'disband' && `确定要解散 "${selectedGroup.name}" 吗？此操作无法撤销。`}
-              {actionType === 'join' && `确定要加入 "${selectedGroup.name}" 吗？`}
-            </p>
-            
+            <h3 className="text-xl font-bold mb-2">{actionType === 'leave' ? '退出小组' : actionType === 'disband' ? '解散小组' : '加入小组'}</h3>
+            <p className="text-gray-500 mb-6">{actionType === 'leave' && `确定要退出 "${selectedGroup.name}" 吗？`}{actionType === 'disband' && `确定要解散 "${selectedGroup.name}" 吗？此操作无法撤销。`}{actionType === 'join' && `确定要加入 "${selectedGroup.name}" 吗？`}</p>
             <div className="flex gap-3">
-              <button 
-                onClick={() => setIsConfirmModalOpen(false)}
-                className="flex-1 py-3 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors"
-              >
-                取消
-              </button>
-              <button 
-                onClick={handleConfirmAction}
-                disabled={isActionLoading}
-                className={`flex-1 py-3 rounded-xl text-white font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2
-                  ${actionType === 'disband' ? 'bg-red-500' : actionType === 'leave' ? 'bg-orange-500' : 'bg-black'}
-                `}
-              >
-                {isActionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : '确认'}
-              </button>
+              <button onClick={() => setIsConfirmModalOpen(false)} className="flex-1 py-3 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">取消</button>
+              <button onClick={handleConfirmAction} disabled={isActionLoading} className={`flex-1 py-3 rounded-xl text-white font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 ${actionType === 'disband' ? 'bg-red-500' : actionType === 'leave' ? 'bg-orange-500' : 'bg-black'}`}>{isActionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : '确认'}</button>
             </div>
           </div>
         </div>

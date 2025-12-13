@@ -9,40 +9,74 @@ export interface Course {
 
 export interface SyncResponse {
   status: string;
+  message: string;
+  courseId: string;
 }
 
-export interface ApiError {
-  message: string;
-  statusCode?: number;
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+}
+
+export interface GroupMember {
+  id: string;
+  userId: string;
+  role: 'creator' | 'admin' | 'member';
+  joinedAt: string;
+  user: User;
 }
 
 export interface CourseFile {
-  id: number;
-  display_name: string;
-  url: string;
-  created_at: string;
-  size: number;
+  id: string;
+  canvasFileId: string;
+  fileName: string;
+  fileSize: number | null;
+  contentType: string | null;
+  downloadUrl: string;
+  status: string;
+  createdAt: string;
 }
 
 export interface FileSummary {
-  fileId: number;
+  fileId: string;
   summary: string;
   keyPoints: string[];
   actionItems?: string[];
 }
 
 export interface StudyGroup {
-  id: number;
+  id: string;
   name: string;
-  courseId: number;
+  description: string;
+  courseId: string;
   courseName: string;
   memberCount: number;
-  maxMembers: number;
-  myRole: 'leader' | 'member' | 'none'; 
-  members?: string[];
+  members: GroupMember[];
+  creator: User;
+  isCreator: boolean;
+  isMember: boolean;
+  isActive: boolean;
 }
 
 export interface CreateGroupParams {
   name: string;
-  courseId: number;
+  courseId: string;
+  courseName: string;
+  description?: string;
+}
+
+export interface Assignment {
+  id: string;
+  name: string;
+  description?: string;
+  dueAt: string | null;
+  pointsPossible?: number;
+  hasSubmittedSubmissions: boolean;
+  htmlUrl?: string;
+  courseId: string;
+  courseName?: string;
+  daysUntilDue?: number;
+  hoursUntilDue?: number;
 }
