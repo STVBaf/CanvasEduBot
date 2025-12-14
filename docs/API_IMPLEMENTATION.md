@@ -607,32 +607,6 @@ GET /api/assignments/upcoming?days=14
   }
 ]
 ```
-67890,
-  "courseId": 12345,
-  "courseName": "软件工程",
-  "courseCode": "SE2024",
-  "name": "期中考试",
-  "description": "<p>期中考试详细说明，包括考试范围、题型等</p>",
-  "dueAt": "2025-02-15T23:59:00Z",
-  "unlockAt": "2025-02-01T00:00:00Z",
-  "lockAt": "2025-02-16T00:00:00Z",
-  "pointsPossible": 100,
-  "submissionTypes": ["online_text_entry", "online_upload"],
-  "allowedExtensions": ["pdf", "docx"],
-  "hasSubmitted": true,
-  "submissionStatus": "graded",
-  "submittedAt": "2025-02-14T20:30:00Z",
-  "grade": "95",
-  "score": 95,
-  "published": true,
-  "htmlUrl": "https://canvas.example.com/courses/12345/assignments/67890",
-  "isOverdue": false,
-  "daysUntilDue": 45,
-  "hoursUntilDue": 1080,
-  "isUrgent": false,
-  "gradingType": "points",
-  "createdAt": "2025-01-15T00:00:00Z",
-  "updatedAt": "2025-02-15T10:00:00Z
 {
   "id": "67890",
   "name": "期中考试",
