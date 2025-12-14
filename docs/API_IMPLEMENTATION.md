@@ -444,32 +444,68 @@ Authorization: Bearer YOUR_CANVAS_ACCESS_TOKEN
 
 **响应示例：**
 ```json
-[
-  {
-    "id": "67890",
-    "name": "期中考试",
-    "description": "<p>期中考试说明</p>",
-    "dueAt": "2025-02-15T23:59:00Z",
-    "unlockAt": "2025-02-01T00:00:00Z",
-    "lockAt": "2025-02-16T00:00:00Z",
-    "pointsPossible": 100,
-    "submissionTypes": ["online_text_entry", "online_upload"],
-    "hasSubmittedSubmissions": false,
-    "courseId": "12345"
-  },
-  {
-    "id": "67891",
-    "name": "作业1 - 算法设计",
-    "description": "<p>实现快速排序算法</p>",
-    "dueAt": "2025-01-30T23:59:00Z",
-    "unlockAt": "2025-01-20T00:00:00Z",
-    "lockAt": "2025-01-31T00:00:00Z",
-    "pointsPossible": 50,
-    "submissionTypes": ["online_upload"],
-    "hasSubmittedSubmissions": true,
-    "courseId": "12345"
-  }
-]
+{
+  "courseId": "12345",
+  "assignments": [
+    {
+      "id": 67890,
+      "courseId": 12345,
+      "courseName": "软件工程",
+      "courseCode": "SE2024",
+      "name": "期中考试",
+      "description": "<p>期中考试说明</p>",
+      "dueAt": "2025-02-15T23:59:00Z",
+      "unlockAt": "2025-02-01T00:00:00Z",
+      "lockAt": "2025-02-16T00:00:00Z",
+      "pointsPossible": 100,
+      "submissionTypes": ["online_text_entry", "online_upload"],
+      "allowedExtensions": [],
+      "hasSubmitted": false,
+      "submissionStatus": "unsubmitted",
+      "submittedAt": null,
+      "grade": null,
+      "score": null,
+      "published": true,
+      "htmlUrl": "https://canvas.example.com/courses/12345/assignments/67890",
+      "isOverdue": false,
+      "daysUntilDue": 45,
+      "hoursUntilDue": 1080,
+      "isUrgent": false,
+      "gradingType": "points",
+      "createdAt": "2025-01-15T00:00:00Z",
+      "updatedAt": "2025-01-15T00:00:00Z"
+    },
+    {
+      "id": 67891,
+      "courseId": 12345,
+      "courseName": "软件工程",
+      "courseCode": "SE2024",
+      "name": "作业1 - 算法设计",
+      "description": "<p>实现快速排序算法</p>",
+      "dueAt": "2025-01-30T23:59:00Z",
+      "unlockAt": "2025-01-20T00:00:00Z",
+      "lockAt": "2025-01-31T00:00:00Z",
+      "pointsPossible": 50,
+      "submissionTypes": ["online_upload"],
+      "allowedExtensions": ["zip", "pdf"],
+      "hasSubmitted": true,
+      "submissionStatus": "graded",
+      "submittedAt": "2025-01-28T15:30:00Z",
+      "grade": "45",
+      "score": 45,
+      "published": true,
+      "htmlUrl": "https://canvas.example.com/courses/12345/assignments/67891",
+      "isOverdue": false,
+      "daysUntilDue": 15,
+      "hoursUntilDue": 360,
+      "isUrgent": false,
+      "gradingType": "points",
+      "createdAt": "2025-01-10T00:00:00Z",
+      "updatedAt": "2025-01-29T10:00:00Z"
+    }
+  ],
+  "total": 2
+}
 ```
 
 ### 5.2 获取即将到期的作业
@@ -490,24 +526,46 @@ GET /api/assignments/upcoming?days=14
 ```json
 [
   {
-    "id": "67891",
-    "name": "作业1 - 算法设计",
+    "id": 67891,
+    "courseId": 12345,
     "courseName": "数据结构与算法",
-    "courseId": "12345",
+    "courseCode": "DSA2024",
+    "name": "作业1 - 算法设计",
+    "description": "<p>实现快速排序算法</p>",
     "dueAt": "2025-01-30T23:59:00Z",
-    "daysUntilDue": 3,
     "pointsPossible": 50,
-    "hasSubmittedSubmissions": false
+    "submissionTypes": ["online_upload"],
+    "hasSubmitted": false,
+    "submissionStatus": "unsubmitted",
+    "submittedAt": null,
+    "grade": null,
+    "score": null,
+    "isOverdue": false,
+    "daysUntilDue": 3,
+    "hoursUntilDue": 72,
+    "isUrgent": true,
+    "htmlUrl": "https://canvas.example.com/courses/12345/assignments/67891"
   },
   {
-    "id": "67892",
-    "name": "项目报告",
+    "id": 67892,
+    "courseId": 12346,
     "courseName": "软件工程",
-    "courseId": "12346",
+    "courseCode": "SE2024",
+    "name": "项目报告",
+    "description": "<p>提交期末项目报告</p>",
     "dueAt": "2025-02-05T23:59:00Z",
-    "daysUntilDue": 9,
     "pointsPossible": 100,
-    "hasSubmittedSubmissions": false
+    "submissionTypes": ["online_upload", "online_text_entry"],
+    "hasSubmitted": true,
+    "submissionStatus": "submitted",
+    "submittedAt": "2025-02-03T10:00:00Z",
+    "grade": null,
+    "score": null,
+    "isOverdue": false,
+    "daysUntilDue": 9,
+    "hoursUntilDue": 216,
+    "isUrgent": false,
+    "htmlUrl": "https://canvas.example.com/courses/12346/assignments/67892"
   }
 ]
 ```
@@ -522,32 +580,33 @@ GET /api/assignments/upcoming?days=14
 ```json
 [
   {
-    "id": "67891",
-    "name": "作业1 - 算法设计",
+    "id": 67891,
+    "courseId": 12345,
     "courseName": "数据结构与算法",
-    "courseId": "12345",
+    "courseCode": "DSA2024",
+    "name": "作业1 - 算法设计",
+    "description": "<p>实现快速排序算法</p>",
     "dueAt": "2025-01-30T23:59:00Z",
+    "pointsPossible": 50,
+    "submissionTypes": ["online_upload"],
+    "hasSubmitted": false,
+    "submissionStatus": "unsubmitted",
+    "submittedAt": null,
+    "grade": null,
+    "score": null,
+    "published": true,
+    "htmlUrl": "https://canvas.example.com/courses/12345/assignments/67891",
+    "isOverdue": false,
     "daysUntilDue": 3,
     "hoursUntilDue": 72,
-    "pointsPossible": 50,
-    "hasSubmittedSubmissions": false,
-    "urgency": "high"
+    "isUrgent": true,
+    "urgencyLevel": "high",
+    "gradingType": "points",
+    "createdAt": "2025-01-10T00:00:00Z",
+    "updatedAt": "2025-01-15T00:00:00Z"
   }
 ]
 ```
-
-### 5.4 获取单个作业详情
-
-**接口：** `GET /api/assignments/:courseId/:assignmentId`
-
-**描述：** 获取指定作业的详细信息
-
-**路径参数：**
-- `courseId`: 课程 ID
-- `assignmentId`: 作业 ID
-
-**响应示例：**
-```json
 {
   "id": "67890",
   "name": "期中考试",
