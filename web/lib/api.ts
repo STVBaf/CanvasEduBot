@@ -40,7 +40,7 @@ export const api = {
   getFileSummary: async (fileId: string): Promise<FileSummary> => { console.warn("API for getFileSummary is mocked!"); return new Promise((resolve) => { setTimeout(() => { resolve({ fileId, summary: "这份文档主要介绍了课程的核心概念...", keyPoints: ["要点1", "要点2"], actionItems: ["复习", "练习"] }); }, 1500); }); },
   getCourseFiles: async (courseId: string | number): Promise<CourseFile[]> => { 
     try {
-      const response = await apiClient.get<{ courseId: string, files: CourseFile[], total: number }>(`/files/course/${courseId}`);
+      const response = await apiClient.get<{ courseId: string, files: CourseFile[], total: number }>(`/files/canvas/course/${courseId}`);
       console.log('[API] getCourseFiles response for course', courseId, ':', response.data);
       
       if (response.data && Array.isArray(response.data.files)) {
