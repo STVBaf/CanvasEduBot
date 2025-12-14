@@ -66,16 +66,18 @@ export function Sidebar() {
         </button>
         
         <div className="pt-4 border-t border-gray-200/50">
-          <div className="flex items-center justify-center lg:justify-start p-2">
-            <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
-              {/* Placeholder Avatar */}
-              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
+          <Link href="/dashboard/profile" className="block">
+            <div className="flex items-center justify-center lg:justify-start p-2 rounded-2xl hover:bg-white/50 transition-colors cursor-pointer">
+              <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                {/* Placeholder Avatar */}
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
+              </div>
+              <div className="hidden lg:block ml-3">
+                <p className="text-sm font-bold text-foreground">同学你好</p>
+                <p className="text-xs text-muted-foreground">在线</p>
+              </div>
             </div>
-            <div className="hidden lg:block ml-3">
-              <p className="text-sm font-bold text-foreground">同学你好</p>
-              <p className="text-xs text-muted-foreground">在线</p>
-            </div>
-          </div>
+          </Link>
         </div>
       </div>
     </aside>

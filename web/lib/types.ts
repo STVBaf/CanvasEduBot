@@ -18,6 +18,8 @@ export interface User {
   name: string;
   email: string;
   avatar?: string;
+  canvasId?: string;
+  createdAt?: string;
 }
 
 export interface GroupMember {

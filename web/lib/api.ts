@@ -1,5 +1,6 @@
+
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import type { Course, SyncResponse, FileSummary, StudyGroup, CreateGroupParams, CourseFile, Assignment } from './types';
+import type { Course, SyncResponse, FileSummary, StudyGroup, CreateGroupParams, CourseFile, Assignment, User } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000/api';
 
@@ -34,7 +35,10 @@ apiClient.interceptors.response.use(
 );
 
 export const api = {
-  getMe: async () => { const response = await apiClient.get('/user/me'); return response.data; },
+  getMe: async (): Promise<User> => { 
+    const response = await apiClient.get<User>('/user/me'); 
+    return response.data; 
+  },
   getCourses: async (): Promise<Course[]> => { const response = await apiClient.get<Course[]>('/courses'); return response.data; },
   syncCourseFiles: async (courseId: string | number): Promise<SyncResponse> => { const response = await apiClient.post<SyncResponse>(`/files/sync?courseId=${courseId}`); return response.data; },
   getFileSummary: async (fileId: string): Promise<FileSummary> => { console.warn("API for getFileSummary is mocked!"); return new Promise((resolve) => { setTimeout(() => { resolve({ fileId, summary: "这份文档主要介绍了课程的核心概念...", keyPoints: ["要点1", "要点2"], actionItems: ["复习", "练习"] }); }, 1500); }); },
