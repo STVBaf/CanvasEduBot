@@ -75,11 +75,11 @@ Authorization: Bearer YOUR_CANVAS_ACCESS_TOKEN
 }
 ```
 
-### 3.2 获取课程文件列表
+### 3.2 获取课程文件列表（从 Canvas）
 
-**接口：** `GET /api/files/course/:courseId`
+**接口：** `GET /api/files/canvas/course/:courseId`
 
-**描述：** 获取指定课程的所有文件
+**描述：** 直接从 Canvas API 获取指定课程的所有文件列表（实时数据，无需同步）
 
 **路径参数：**
 - `courseId`: 课程 ID
@@ -90,13 +90,46 @@ Authorization: Bearer YOUR_CANVAS_ACCESS_TOKEN
   "courseId": "101",
   "files": [
     {
-      "id": "file_123",
+      "id": 456,
+      "displayName": "第一讲课件.pdf",
+      "fileName": "lecture01.pdf",
+      "size": 1024000,
+      "contentType": "application/pdf",
+      "url": "https://canvas.example.com/files/456/download?download_frd=1",
+      "createdAt": "2024-12-01T10:00:00Z",
+      "updatedAt": "2024-12-01T10:05:00Z",
+      "modifiedAt": "2024-12-01T10:05:00Z",
+      "locked": false,
+      "hidden": false,
+      "thumbnailUrl": "https://canvas.example.com/thumbnails/456.jpg"
+    }
+  ],
+  "total": 1
+}
+```
+
+### 3.3 获取已同步的文件列表
+
+**接口：** `GET /api/files/course/:courseId`
+
+**描述：** 获取已同步到数据库的课程文件列表（需要先调用同步接口）
+
+**路径参数：**
+- `courseId`: 课程 ID
+
+**响应示例：**
+```json
+{
+  "courseId": "101",
+  "files": [
+    {
+      "id": "file_clxxx123",
       "canvasFileId": "456",
       "fileName": "lecture01.pdf",
       "fileSize": 1024000,
       "contentType": "application/pdf",
       "downloadUrl": "https://canvas.example.com/files/456/download",
-      "localPath": "/files/lecture01.pdf",
+      "localPath": "/app/files/lecture01.pdf",
       "status": "downloaded",
       "createdAt": "2024-12-01T10:00:00Z",
       "updatedAt": "2024-12-01T10:05:00Z"
@@ -106,30 +139,50 @@ Authorization: Bearer YOUR_CANVAS_ACCESS_TOKEN
 }
 ```
 
-### 3.3 获取文件详情
+### 3.4 获取文件详情
 
 **接口：** `GET /api/files/:fileId`
 
-**描述：** 获取单个文件的详细信息
+**描述：** 获取数据库中单个文件的详细元数据信息
 
 **路径参数：**
-- `fileId`: 文件 ID
+- `fileId`: 文件 ID（数据库中的文件 ID，非 Canvas 文件 ID）
 
 **响应示例：**
 ```json
 {
-  "id": "file_123",
+  "id": "file_clxxx123",
   "canvasFileId": "456",
   "fileName": "lecture01.pdf",
   "fileSize": 1024000,
   "contentType": "application/pdf",
   "downloadUrl": "https://canvas.example.com/files/456/download",
-  "localPath": "/files/lecture01.pdf",
+  "localPath": "/app/files/lecture01.pdf",
   "status": "downloaded",
+  "courseId": "101",
+  "userId": "user_clxxx456",
   "createdAt": "2024-12-01T10:00:00Z",
   "updatedAt": "2024-12-01T10:05:00Z"
 }
 ```
+
+### 3.5 下载文件
+
+**接口：** `GET /api/files/download/:fileId`
+
+**描述：** 下载指定的 Canvas 文件（返回文件流）
+
+**路径参数：**
+- `fileId`: Canvas 文件 ID
+
+**响应头：**
+```
+Content-Type: application/pdf (或对应的文件类型)
+Content-Disposition: attachment; filename="lecture01.pdf"
+Content-Length: 1024000
+```
+
+**响应：** 文件二进制流
 
 ---
 
@@ -570,11 +623,11 @@ GET /api/assignments/upcoming?days=14
 ]
 ```
 
-### 5.3 获取紧急作业（3天内截止）
+### 5.3 获取紧急作业（7天内截止）
 
 **接口：** `GET /api/assignments/urgent`
 
-**描述：** 获取 3 天内截止的紧急作业
+**描述：** 获取 7 天内截止的紧急作业
 
 **响应示例：**
 ```json
@@ -607,8 +660,24 @@ GET /api/assignments/upcoming?days=14
   }
 ]
 ```
+
+### 5.4 获取单个作业详情
+
+**接口：** `GET /api/assignments/course/:courseId/assignment/:assignmentId`
+
+**描述：** 获取指定作业的详细信息
+
+**路径参数：**
+- `courseId`: 课程 ID
+- `assignmentId`: 作业 ID
+
+**响应示例：**
+```json
 {
-  "id": "67890",
+  "id": 67890,
+  "courseId": 12345,
+  "courseName": "软件工程",
+  "courseCode": "SE2024",
   "name": "期中考试",
   "description": "<p>期中考试详细说明，包括考试范围、题型等</p>",
   "dueAt": "2025-02-15T23:59:00Z",
@@ -618,9 +687,19 @@ GET /api/assignments/upcoming?days=14
   "gradingType": "points",
   "submissionTypes": ["online_text_entry", "online_upload"],
   "allowedExtensions": ["pdf", "docx"],
-  "hasSubmittedSubmissions": false,
-  "courseId": "12345",
-  "htmlUrl": "https://canvas.example.com/courses/12345/assignments/67890"
+  "hasSubmitted": false,
+  "submissionStatus": "unsubmitted",
+  "submittedAt": null,
+  "grade": null,
+  "score": null,
+  "published": true,
+  "htmlUrl": "https://canvas.example.com/courses/12345/assignments/67890",
+  "isOverdue": false,
+  "daysUntilDue": 45,
+  "hoursUntilDue": 1080,
+  "isUrgent": false,
+  "createdAt": "2025-01-15T00:00:00Z",
+  "updatedAt": "2025-01-15T00:00:00Z"
 }
 ```
 

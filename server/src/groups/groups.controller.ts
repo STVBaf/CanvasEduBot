@@ -6,11 +6,12 @@ import {
   Delete,
   Body, 
   Param, 
-  Query,
-  Headers, 
-  UnauthorizedException 
+  Query
 } from '@nestjs/common';
 import { GroupsService } from './groups.service';
+import { GetToken } from '../auth/get-token.decorator';
+import { CreateGroupDto } from './dto/create-group.dto';
+import { UpdateGroupDto } from './dto/update-group.dto';
 
 @Controller('groups')
 export class GroupsController {
@@ -22,15 +23,10 @@ export class GroupsController {
    */
   @Post()
   async createGroup(
-    @Body() body: { courseId: string; courseName?: string; name: string; description?: string },
-    @Headers('authorization') authHeader?: string
+    @Body() dto: CreateGroupDto,
+    @GetToken() token: string
   ) {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('缺少认证令牌');
-    }
-
-    const token = authHeader.split(' ')[1];
-    const group = await this.groupsService.createGroup(token, body);
+    const group = await this.groupsService.createGroup(token, dto);
 
     return {
       success: true,
@@ -46,13 +42,8 @@ export class GroupsController {
   @Get('my')
   async getMyGroups(
     @Query('courseId') courseId: string | undefined,
-    @Headers('authorization') authHeader?: string
+    @GetToken() token: string
   ) {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('缺少认证令牌');
-    }
-
-    const token = authHeader.split(' ')[1];
     const groups = await this.groupsService.getUserGroups(token, courseId);
 
     return {
@@ -68,13 +59,8 @@ export class GroupsController {
   @Get('course/:courseId')
   async getCourseGroups(
     @Param('courseId') courseId: string,
-    @Headers('authorization') authHeader?: string
+    @GetToken() token: string
   ) {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('缺少认证令牌');
-    }
-
-    const token = authHeader.split(' ')[1];
     const groups = await this.groupsService.getCourseGroups(token, courseId);
 
     return {
@@ -91,13 +77,8 @@ export class GroupsController {
   @Get(':groupId')
   async getGroupDetail(
     @Param('groupId') groupId: string,
-    @Headers('authorization') authHeader?: string
+    @GetToken() token: string
   ) {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('缺少认证令牌');
-    }
-
-    const token = authHeader.split(' ')[1];
     const group = await this.groupsService.getGroupDetail(token, groupId);
 
     return group;
@@ -110,13 +91,8 @@ export class GroupsController {
   @Post(':groupId/join')
   async joinGroup(
     @Param('groupId') groupId: string,
-    @Headers('authorization') authHeader?: string
+    @GetToken() token: string
   ) {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('缺少认证令牌');
-    }
-
-    const token = authHeader.split(' ')[1];
     return await this.groupsService.joinGroup(token, groupId);
   }
 
@@ -127,13 +103,8 @@ export class GroupsController {
   @Post(':groupId/leave')
   async leaveGroup(
     @Param('groupId') groupId: string,
-    @Headers('authorization') authHeader?: string
+    @GetToken() token: string
   ) {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('缺少认证令牌');
-    }
-
-    const token = authHeader.split(' ')[1];
     return await this.groupsService.leaveGroup(token, groupId);
   }
 
@@ -144,15 +115,10 @@ export class GroupsController {
   @Put(':groupId')
   async updateGroup(
     @Param('groupId') groupId: string,
-    @Body() body: { name?: string; description?: string; isActive?: boolean },
-    @Headers('authorization') authHeader?: string
+    @Body() dto: UpdateGroupDto,
+    @GetToken() token: string
   ) {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('缺少认证令牌');
-    }
-
-    const token = authHeader.split(' ')[1];
-    return await this.groupsService.updateGroup(token, groupId, body);
+    return await this.groupsService.updateGroup(token, groupId, dto);
   }
 
   /**
@@ -162,13 +128,8 @@ export class GroupsController {
   @Delete(':groupId')
   async deleteGroup(
     @Param('groupId') groupId: string,
-    @Headers('authorization') authHeader?: string
+    @GetToken() token: string
   ) {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('缺少认证令牌');
-    }
-
-    const token = authHeader.split(' ')[1];
     return await this.groupsService.deleteGroup(token, groupId);
   }
 
@@ -180,13 +141,8 @@ export class GroupsController {
   async removeMember(
     @Param('groupId') groupId: string,
     @Param('memberId') memberId: string,
-    @Headers('authorization') authHeader?: string
+    @GetToken() token: string
   ) {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('缺少认证令牌');
-    }
-
-    const token = authHeader.split(' ')[1];
     return await this.groupsService.removeMember(token, groupId, memberId);
   }
 }
