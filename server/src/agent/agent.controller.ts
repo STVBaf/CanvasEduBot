@@ -7,7 +7,10 @@ import {
     BadRequestException,
     Logger,
     Param,
+    UseInterceptors,
+    UploadedFile,
   } from '@nestjs/common';
+  import { FileInterceptor } from '@nestjs/platform-express';
   import { AgentService } from './agent.service';
   import { CanvasService } from '../canvas/canvas.service';
   import { AssignmentsService } from '../assignments/assignments.service';
@@ -30,7 +33,7 @@ import {
      */
     @Post('summary')
     async generateCourseSummary(
-      @Body() body: { courseId: string; text?: string },
+      @Body() body: { courseId: string; text?: string; botId?: string },
       @Headers('authorization') authHeader?: string
     ) {
       // 1. 验证认证
@@ -71,11 +74,12 @@ import {
   
         // 4. 调用 Agent 生成总结
         this.logger.log(`开始生成课程 ${body.courseId} 的 AI 总结...`);
-        const summary = await this.agentService.generateSummary(contentText);
-  
+        const summary = await this.agentService.generateSummary(contentText, body.botId);
+
         return {
           content: summary,
           courseId: body.courseId,
+          botId: body.botId,
           generatedAt: new Date().toISOString(),
         };
       } catch (error: any) {
@@ -165,6 +169,7 @@ import {
     @Post('analyze-ppt/:fileId')
     async analyzePPTByFileId(
       @Param('fileId') fileId: string,
+      @Body() body: { botId?: string } = {},
       @Headers('authorization') authHeader?: string
     ) {
       // 1. 验证认证
@@ -186,38 +191,51 @@ import {
       }
 
       try {
-        // 2. 获取文件信息
-        this.logger.log(`开始获取文件 ${fileId} 的信息...`);
+        // 2. 下载文件内容
+        this.logger.log(`开始下载文件 ${fileId}...`);
         const fileInfo = await this.filesService.downloadSingleFile(token, fileId);
         
-        // 检查是否为PPT文件
-        const isPPT = fileInfo.contentType?.includes('presentation') || 
-                      fileInfo.fileName?.match(/\.(ppt|pptx)$/i);
+        // 打印详细的文件信息用于调试
+        this.logger.debug(`文件下载完成:
+  - 文件名: ${fileInfo.fileName}
+  - Content-Type: ${fileInfo.contentType}
+  - 文件大小: ${fileInfo.size} bytes
+  - Buffer 有效: ${Buffer.isBuffer(fileInfo.buffer)}
+  - Buffer 长度: ${fileInfo.buffer?.length || 0}
+  - 文件头 (hex): ${fileInfo.buffer?.slice(0, 8).toString('hex') || 'N/A'}`);
         
-        if (!isPPT) {
-          throw new BadRequestException({
-            statusCode: 400,
-            message: '该文件不是PPT格式，请选择 .ppt 或 .pptx 文件',
-            error: 'Bad Request'
-          });
+        // 验证是否为 Office 文件（检查文件头）
+        if (fileInfo.buffer && fileInfo.buffer.length >= 4) {
+          const fileHeader = fileInfo.buffer.slice(0, 4).toString('hex');
+          const isPKZip = fileHeader === '504b0304'; // PK zip format (docx, pptx, xlsx)
+          this.logger.debug(`文件格式检查: ${isPKZip ? 'ZIP/Office 格式 ✅' : '其他格式 (header: ' + fileHeader + ')'}`);
+        }
+        
+        // 检查文件类型（不仅限于PPT，支持所有文档）
+        const isDocument = fileInfo.contentType?.includes('presentation') || 
+                          fileInfo.contentType?.includes('document') ||
+                          fileInfo.contentType?.includes('pdf') ||
+                          fileInfo.contentType?.includes('text') ||
+                          fileInfo.fileName?.match(/\.(ppt|pptx|doc|docx|pdf|txt|md)$/i);
+        
+        if (!isDocument) {
+          this.logger.warn(`文件类型可能不支持: ${fileInfo.contentType}`);
         }
 
-        // 3. 获取Canvas文件URL
-        const canvasFileInfo = await this.canvasService.getFileInfo(token, fileId);
-        const fileUrl = canvasFileInfo.url || canvasFileInfo['url'];
-
-        // 4. 调用 Agent 分析PPT
-        this.logger.log(`开始分析PPT文件: ${fileInfo.fileName}...`);
-        const analysis = await this.agentService.analyzePPT(
-          fileUrl,
+        // 3. 使用文件 buffer 调用 Agent 分析
+        this.logger.log(`开始分析文件: ${fileInfo.fileName} (${fileInfo.size} bytes)...`);
+        const analysis = await this.agentService.analyzeFile(
+          fileInfo.buffer,      // 传递文件 buffer
           fileInfo.fileName,
-          undefined // 如果有提取的文本内容，可以传这里
+          fileInfo.contentType || 'application/octet-stream',
+          body.botId           // 传递 botId
         );
 
         return {
           content: analysis,
           fileId: fileId,
           fileName: fileInfo.fileName,
+          botId: body.botId,
           analyzedAt: new Date().toISOString(),
         };
       } catch (error: any) {
@@ -239,7 +257,7 @@ import {
      */
     @Post('analyze-ppt')
     async analyzePPTByCourse(
-      @Body() body: { courseId: string; fileName?: string; fileId?: string },
+      @Body() body: { courseId: string; fileName?: string; fileId?: string; botId?: string },
       @Headers('authorization') authHeader?: string
     ) {
       // 1. 验证认证
@@ -340,7 +358,7 @@ import {
           });
         }
 
-        return await this.analyzePPTByFileId(fileId, authHeader);
+        return await this.analyzePPTByFileId(fileId, { botId: body.botId }, authHeader);
       } catch (error: any) {
         this.logger.error(`分析PPT失败: ${error?.message || error}`, error?.stack);
         if (error instanceof BadRequestException || error instanceof UnauthorizedException) {
@@ -353,4 +371,182 @@ import {
         });
       }
     }
-  }
+
+    /**
+     * 通用 Agent 对话接口
+     * POST /api/agent/chat
+     * 支持任意 Bot ID 和对话内容
+     */
+    @Post('chat')
+    async chatWithAgent(
+      @Body() body: { 
+        botId: string;
+        message: string;
+        fileUrl?: string;
+        fileName?: string;
+      },
+      @Headers('authorization') authHeader?: string
+    ) {
+      // 1. 验证认证
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        throw new UnauthorizedException({
+          statusCode: 401,
+          message: '缺少认证令牌，请先登录',
+          error: 'Unauthorized'
+        });
+      }
+
+      const token = authHeader.split(' ')[1];
+      if (!token) {
+        throw new UnauthorizedException({
+          statusCode: 401,
+          message: 'Token 格式无效',
+          error: 'Unauthorized'
+        });
+      }
+
+      // 2. 验证参数
+      if (!body.botId) {
+        throw new BadRequestException({
+          statusCode: 400,
+          message: '缺少 Bot ID',
+          error: 'Bad Request'
+        });
+      }
+
+      if (!body.message) {
+        throw new BadRequestException({
+          statusCode: 400,
+          message: '缺少对话内容',
+          error: 'Bad Request'
+        });
+      }
+
+      try {
+        this.logger.log(`开始与 Agent ${body.botId} 对话...`);
+        
+        // 3. 调用通用对话方法
+        const response = await this.agentService.chatWithBot(
+          body.botId,
+          body.message,
+          body.fileUrl,
+          body.fileName
+        );
+
+        return {
+          content: response,
+          botId: body.botId,
+          message: body.message,
+          respondedAt: new Date().toISOString(),
+        };
+      } catch (error: any) {
+        this.logger.error(`Agent 对话失败: ${error?.message || error}`, error?.stack);
+        throw new BadRequestException({
+          statusCode: 500,
+          message: `Agent 对话失败: ${error?.message || '未知错误'}`,
+          error: 'Internal Server Error'
+        });
+      }
+    }
+    /**
+     * 通用文件上传并分析
+     * POST /api/agent/analyze-file
+     * 支持：PDF, DOC/DOCX, PPT/PPTX, TXT, XLS/XLSX 等
+     */
+    @Post('analyze-file')
+    @UseInterceptors(FileInterceptor('file', {
+      limits: {
+        fileSize: 50 * 1024 * 1024, // 50MB
+      },
+      fileFilter: (req, file, cb) => {
+        // 支持的文件类型
+        const allowedMimes = [
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-powerpoint',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'text/plain',
+          'text/markdown',
+          'application/json',
+        ];
+        
+        const allowedExts = /\.(pdf|doc|docx|ppt|pptx|xls|xlsx|txt|md|json)$/i;
+        
+        if (allowedMimes.includes(file.mimetype) || allowedExts.test(file.originalname)) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException({
+            statusCode: 400,
+            message: `不支持的文件类型: ${file.mimetype}。支持的格式: PDF, DOC/DOCX, PPT/PPTX, XLS/XLSX, TXT, MD, JSON`,
+            error: 'Bad Request'
+          }), false);
+        }
+      },
+    }))
+    async analyzeUploadedFile(
+      @UploadedFile() file: Express.Multer.File,
+      @Body() body: { botId?: string; prompt?: string },
+      @Headers('authorization') authHeader?: string
+    ) {
+      // 1. 验证认证
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        throw new UnauthorizedException({
+          statusCode: 401,
+          message: '缺少认证令牌，请先登录',
+          error: 'Unauthorized'
+        });
+      }
+
+      const token = authHeader.split(' ')[1];
+      if (!token) {
+        throw new UnauthorizedException({
+          statusCode: 401,
+          message: 'Token 格式无效',
+          error: 'Unauthorized'
+        });
+      }
+
+      // 2. 验证文件
+      if (!file) {
+        throw new BadRequestException({
+          statusCode: 400,
+          message: '请上传文件',
+          error: 'Bad Request'
+        });
+      }
+
+      try {
+        this.logger.log(`收到文件上传: ${file.originalname}, 大小: ${file.size} bytes, 类型: ${file.mimetype}`);
+
+        // 3. 调用 Agent 分析文件
+        const analysis = await this.agentService.analyzeFile(
+          file.buffer,
+          file.originalname,
+          file.mimetype,
+          body.botId,
+          body.prompt
+        );
+
+        return {
+          content: analysis,
+          fileName: file.originalname,
+          fileSize: file.size,
+          fileType: file.mimetype,
+          botId: body.botId,
+          analyzedAt: new Date().toISOString(),
+        };
+      } catch (error: any) {
+        this.logger.error(`分析文件失败: ${error?.message || error}`, error?.stack);
+        if (error instanceof BadRequestException || error instanceof UnauthorizedException) {
+          throw error;
+        }
+        throw new BadRequestException({
+          statusCode: 500,
+          message: `分析文件失败: ${error?.message || '未知错误'}`,
+          error: 'Internal Server Error'
+        });
+      }
+    }  }
