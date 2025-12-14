@@ -94,9 +94,7 @@ export class AssignmentsService {
     // 检查当前用户是否已提交
     // Canvas API 在 include=['submission'] 时会返回 submission 对象
     const submission = assignment.submission;
-    const hasSubmitted = submission?.workflow_state !== null && 
-                        submission?.workflow_state !== undefined &&
-                        submission.workflow_state !== '' && 
+    const hasSubmitted = submission?.workflow_state && 
                         submission.workflow_state !== 'unsubmitted';
 
     return {
