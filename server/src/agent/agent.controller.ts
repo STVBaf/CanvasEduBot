@@ -293,18 +293,35 @@ import {
             });
           }
 
-          // 如果指定了文件名，查找匹配的文件
+          // 如果指定了文件名，查找匹配的文件（支持模糊匹配）
           if (fileName) {
-            const matchedFile = pptFiles.find((file: any) => 
-              file.fileName === fileName || file.displayName === fileName
-            );
+            const matchedFile = pptFiles.find((file: any) => {
+              const name1 = file.fileName || '';
+              const name2 = file.displayName || '';
+              // 精确匹配
+              if (name1 === fileName || name2 === fileName) return true;
+              // 模糊匹配（包含关键词）
+              if (name1.includes(fileName) || name2.includes(fileName)) return true;
+              // 移除扩展名后匹配
+              const nameWithoutExt = fileName.replace(/\.(ppt|pptx)$/i, '');
+              if (name1.includes(nameWithoutExt) || name2.includes(nameWithoutExt)) return true;
+              return false;
+            });
+            
             if (matchedFile) {
               fileId = matchedFile.id;
+              fileName = matchedFile.displayName || matchedFile.fileName;
             } else {
+              // 返回可用的PPT文件列表帮助用户选择
+              const availableFiles = pptFiles.map((f: any) => ({
+                id: f.id,
+                name: f.displayName || f.fileName
+              }));
               throw new BadRequestException({
                 statusCode: 404,
-                message: `未找到文件名为 "${fileName}" 的PPT文件`,
-                error: 'Not Found'
+                message: `未找到文件名包含 "${fileName}" 的PPT文件`,
+                error: 'Not Found',
+                availableFiles: availableFiles.slice(0, 10), // 返回前10个可用文件
               });
             }
           } else {
