@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bot, Calendar, FileText, ArrowLeft, Sparkles, X, Loader2, Download, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
 import type { FileSummary, CourseFile, Assignment } from '@/lib/types';
 
@@ -30,14 +31,35 @@ export default function CourseDetailPage() {
     const fetchData = async () => {
       setIsLoadingData(true);
       try {
+        console.log('[CourseDetail] Fetching data for course:', courseId);
+        
         const [filesResponse, assignmentsResponse] = await Promise.all([
           api.getCourseFiles(courseId),
           api.getCourseAssignments(courseId)
         ]);
-        setFiles(filesResponse);
-        setAssignments(assignmentsResponse);
+        
+        console.log('[CourseDetail] Files:', filesResponse);
+        console.log('[CourseDetail] Assignments:', assignmentsResponse);
+        
+        setFiles(Array.isArray(filesResponse) ? filesResponse : []);
+        
+        // Sort assignments by due date (earliest first)
+        if (Array.isArray(assignmentsResponse)) {
+          const sortedAssignments = assignmentsResponse
+            .filter(a => a.dueAt) // Only keep assignments with due dates
+            .sort((a, b) => {
+              const dateA = new Date(a.dueAt!).getTime();
+              const dateB = new Date(b.dueAt!).getTime();
+              return dateA - dateB;
+            });
+          setAssignments(sortedAssignments);
+        } else {
+          setAssignments([]);
+        }
       } catch (error) {
-        console.error("Failed to fetch course details:", error);
+        console.error("[CourseDetail] Failed to fetch course details:", error);
+        setFiles([]);
+        setAssignments([]);
       } finally {
         setIsLoadingData(false);
       }
@@ -75,18 +97,39 @@ export default function CourseDetailPage() {
     return date.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
-  const formatSize = (bytes: number | null) => {
-    if (bytes === null || bytes === 0) return '0 B';
+  const formatSize = (bytes: number | null | undefined) => {
+    if (bytes === null || bytes === undefined) return '未知大小';
+    if (bytes === 0) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const item = {
+    hidden: { y: 20, opacity: 0 },
+    show: { y: 0, opacity: 1 }
   };
 
   return (
-    <div className="space-y-8 relative"> 
+    <motion.div 
+      variants={container}
+      initial="hidden"
+      animate="show"
+      className="space-y-8 relative"
+    > 
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <motion.div variants={item} className="flex items-center gap-4">
         <Link href="/dashboard/courses" className="p-2 rounded-full hover:bg-gray-100 transition-colors">
           <ArrowLeft className="w-6 h-6" />
         </Link>
@@ -94,11 +137,12 @@ export default function CourseDetailPage() {
           <h1 className="text-3xl font-bold text-foreground">课程详情</h1>
           <p className="text-muted-foreground">Course ID: {courseId}</p>
         </div>
-      </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           
+          <motion.div variants={item}>
           <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-none overflow-hidden">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-indigo-900">
@@ -122,8 +166,10 @@ export default function CourseDetailPage() {
               </div>
             </CardContent>
           </Card>
+          </motion.div>
 
           {/* Course Files List */}
+           <motion.div variants={item}>
            <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -178,10 +224,11 @@ export default function CourseDetailPage() {
               )}
             </CardContent>
           </Card>
+          </motion.div>
         </div>
 
         {/* Right Column: Assignments */}
-        <div className="space-y-8">
+        <motion.div variants={item} className="space-y-8">
           <Card className="h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -222,7 +269,7 @@ export default function CourseDetailPage() {
               )}
             </CardContent>
           </Card>
-        </div>
+        </motion.div>
       </div>
 
       {/* AI 总结弹窗 */}
@@ -235,6 +282,6 @@ export default function CourseDetailPage() {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

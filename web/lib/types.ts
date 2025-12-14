@@ -72,11 +72,15 @@ export interface Assignment {
   name: string;
   description?: string;
   dueAt: string | null;
+  unlockAt?: string | null;
+  lockAt?: string | null;
   pointsPossible?: number;
+  submissionTypes?: string[];
   hasSubmittedSubmissions: boolean;
   htmlUrl?: string;
   courseId: string;
   courseName?: string;
   daysUntilDue?: number;
   hoursUntilDue?: number;
+  urgency?: string;
 }
