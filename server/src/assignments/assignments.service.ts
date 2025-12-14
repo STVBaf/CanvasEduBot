@@ -91,6 +91,12 @@ export class AssignmentsService {
       description = this.decodeUnicodeString(description);
     }
 
+    // 检查当前用户是否已提交
+    // Canvas API 在 include=['submission'] 时会返回 submission 对象
+    const submission = assignment.submission;
+    const hasSubmitted = submission?.workflow_state && 
+                        submission.workflow_state !== 'unsubmitted';
+
     return {
       id: assignment.id,
       courseId: assignment.course_id,
@@ -104,7 +110,11 @@ export class AssignmentsService {
       pointsPossible: assignment.points_possible,
       submissionTypes: assignment.submission_types || [],
       allowedExtensions: assignment.allowed_extensions || [],
-      hasSubmittedSubmissions: assignment.has_submitted_submissions || false,
+      hasSubmitted: hasSubmitted,
+      submissionStatus: submission?.workflow_state || 'unsubmitted',
+      submittedAt: submission?.submitted_at || null,
+      grade: submission?.grade || null,
+      score: submission?.score || null,
       published: assignment.published || false,
       htmlUrl: assignment.html_url,
       isOverdue,
