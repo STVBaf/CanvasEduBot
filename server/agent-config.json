@@ -1,0 +1,14 @@
+{
+    "summary_agent": {
+      "description": "课程总结助手",
+      "api_token": "cztei_ljrzfg18aaaOZvUnE9oaTbY1npyuW3ZRVrl8momhhppDvth5MH7ecRWTcLBOuR6bx",
+      "bot_id": "7582959222351167524",
+      "base_url": "https://api.coze.cn"
+    },
+    "ppt_agent": {
+      "description": "课件解读师",
+      "api_token": "cztei_ljrzfg18aaaOZvUnE9oaTbY1npyuW3ZRVrl8momhhppDvth5MH7ecRWTcLBOuR6bx",
+      "bot_id": "7582988139266998307",
+      "base_url": "https://api.coze.cn"
+    }
+  }

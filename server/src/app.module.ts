@@ -11,6 +11,7 @@ import { GroupsModule } from './groups/groups.module';
 import { AssignmentsModule } from './assignments/assignments.module';
 import { FilesProcessor } from './files/files.processor';
 import { AgentService } from './agent/agent.service';
+import { Module } from '@nestjs/common';
 
 @Module({
 	imports: [
@@ -24,6 +25,7 @@ import { AgentService } from './agent/agent.service';
 		UserModule,
 		GroupsModule,
 		AssignmentsModule,
+		AgentModule,
 	],
 	providers: [FilesProcessor,AgentService],
 })

@@ -210,8 +210,7 @@ import {
         this.logger.log(`开始分析PPT文件: ${fileInfo.fileName}...`);
         const analysis = await this.agentService.analyzePPT(
           fileUrl,
-          fileInfo.fileName,
-          undefined // 如果有提取的文本内容，可以传这里
+          fileInfo.fileName
         );
 
         return {
