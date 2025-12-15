@@ -1,5 +1,7 @@
 # Agent API 文档
 
+> 状态（2025-12-15）：调用 Agent 需要有效的 **Canvas Access Token**（手动 Token 登录）；后端基于 MySQL/Redis。OAuth2 尚未开放。
+
 Canvas Helper 的 AI Agent 功能基于 Coze 平台，提供课程总结、文档分析、智能对话等功能。
 
 ## 📋 目录

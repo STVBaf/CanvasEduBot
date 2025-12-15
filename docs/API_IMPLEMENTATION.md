@@ -1,5 +1,7 @@
 # Canvas Helper 后端 API 文档
 
+> 状态（2025-12-15）：当前认证方式为 **手动 Canvas Access Token**；数据库使用 **MySQL**；OAuth2 尚未启用。若遇到与旧版 SQLite/OAuth 相关的说明，请以 README 与此文档为准。
+
 ## 认证说明
 
 所有接口都需要在请求头中携带 Canvas Access Token：
