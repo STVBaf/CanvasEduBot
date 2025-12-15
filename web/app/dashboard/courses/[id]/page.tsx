@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { api } from '@/lib/api';
-import type { FileSummary, CourseFile, Assignment } from '@/lib/types';
+import type { FileSummary, CourseFile, Assignment, Course } from '@/lib/types';
 
 export default function CourseDetailPage() {
   const params = useParams();
@@ -23,6 +23,7 @@ export default function CourseDetailPage() {
   const [summaryError, setSummaryError] = useState<string>('');
 
   // 数据状态
+  const [course, setCourse] = useState<Course | null>(null);
   const [files, setFiles] = useState<CourseFile[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -41,27 +42,25 @@ export default function CourseDetailPage() {
     const fetchData = async () => {
       setIsLoadingData(true);
       try {
-        console.log('[CourseDetail] Fetching data for course:', courseId);
-        
-        const [filesResponse, assignmentsResponse] = await Promise.all([
+        const [coursesResponse, filesResponse, assignmentsResponse] = await Promise.all([
+          api.getCourses(),
           api.getCourseFiles(courseId),
           api.getCourseAssignments(courseId)
         ]);
         
-        console.log('[CourseDetail] Files:', filesResponse);
-        console.log('[CourseDetail] Assignments:', assignmentsResponse);
+        // 从课程列表中找到当前课程
+        const currentCourse = coursesResponse.find(c => String(c.id) === String(courseId));
+        setCourse(currentCourse || null);
         
-        // Log first file to check structure
-        if (Array.isArray(filesResponse) && filesResponse.length > 0) {
-          console.log('[CourseDetail] First file structure:', filesResponse[0]);
-          console.log('[CourseDetail] First file canvasFileId:', filesResponse[0].canvasFileId);
-        }
+        // 确保是数组，并过滤掉可能有问题的文件
+        const validFiles = Array.isArray(filesResponse) 
+          ? filesResponse.filter(f => f && f.id && f.fileName)
+          : [];
         
-        setFiles(Array.isArray(filesResponse) ? filesResponse : []);
+        setFiles(validFiles);
         
         // 如果数据库中没有文件，自动触发同步
-        if (!filesResponse || filesResponse.length === 0) {
-          console.log('[CourseDetail] No files found in database, triggering auto-sync...');
+        if (validFiles.length === 0) {
           await handleAutoSync();
         }
         
@@ -98,19 +97,21 @@ export default function CourseDetailPage() {
     setSyncMessage('正在同步课程文件...');
     
     try {
-      console.log('[CourseDetail] Starting auto file sync for course:', courseId);
-      const result = await api.syncCourseFiles(courseId);
-      console.log('[CourseDetail] Sync result:', result);
-      
+      await api.syncCourseFiles(courseId);
       setSyncMessage('文件同步成功，正在刷新...');
       
-      // 等待 2 秒让后台任务处理
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 等待 3 秒让后台任务处理文件元数据
+      await new Promise(resolve => setTimeout(resolve, 3000));
       
       // 重新获取文件列表
       const filesResponse = await api.getCourseFiles(courseId);
-      console.log('[CourseDetail] Files after sync:', filesResponse);
-      setFiles(Array.isArray(filesResponse) ? filesResponse : []);
+      
+      // 过滤有效文件
+      const validFiles = Array.isArray(filesResponse) 
+        ? filesResponse.filter(f => f && f.id && f.fileName)
+        : [];
+      
+      setFiles(validFiles);
       
       setSyncMessage('');
     } catch (error: any) {
@@ -128,13 +129,8 @@ export default function CourseDetailPage() {
     setCourseSummaryError('');
     
     try {
-      console.log('[CourseDetail] Generating course summary for:', courseId);
       const result = await api.generateCourseSummary(courseId, '7582959222351167524');
-      console.log('[CourseDetail] Course summary result:', result);
-      console.log('[CourseDetail] Course summary content type:', typeof result.content);
-      console.log('[CourseDetail] Course summary content preview:', result.content.substring(0, 200));
       setCourseSummary(result.content);
-      console.log('[CourseDetail] Course summary generated successfully');
     } catch (error: any) {
       console.error('[CourseDetail] Failed to generate course summary:', error);
       setCourseSummaryError(error.response?.data?.message || error.message || '生成课程总结失败');
@@ -152,22 +148,13 @@ export default function CourseDetailPage() {
     setSummaryError('');
 
     try {
-      console.log('[CourseDetail] File object:', file);
-      console.log('[CourseDetail] Analyzing file - ID:', file.canvasFileId, 'Name:', file.fileName);
-      console.log('[CourseDetail] File ID type:', typeof file.canvasFileId);
-      
       if (!file.canvasFileId) {
         throw new Error('文件 ID 缺失，无法进行分析');
       }
       
       const result = await api.analyzeCanvasFile(file.canvasFileId, '7582988139266998307');
-      console.log('[CourseDetail] File analysis result:', result);
-      console.log('[CourseDetail] File analysis content type:', typeof result.content);
-      console.log('[CourseDetail] File analysis content preview:', result.content.substring(0, 200));
       setAiSummaryContent(result.content);
-      console.log('[CourseDetail] File analysis completed');
     } catch (error: any) {
-      console.error('[CourseDetail] Failed to analyze file:', error);
       setSummaryError(error.response?.data?.message || error.message || '文件分析失败');
     } finally {
       setIsLoadingSummary(false);
@@ -223,7 +210,9 @@ export default function CourseDetailPage() {
           <ArrowLeft className="w-6 h-6" />
         </Link>
         <div>
-          <h1 className="text-3xl font-bold text-foreground">课程详情</h1>
+          <h1 className="text-3xl font-bold text-foreground">
+            {isLoadingData ? '加载中...' : course ? course.name : '课程详情'}
+          </h1>
           <p className="text-muted-foreground">Course ID: {courseId}</p>
         </div>
       </motion.div>
@@ -321,43 +310,59 @@ export default function CourseDetailPage() {
                 </div>
               ) : files.length > 0 ? (
                 <div className="space-y-3">
-                  {files.map((file) => (
-                    <div key={file.id} className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-md transition-all border border-transparent hover:border-gray-100 group">
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
-                          <FileText className="w-5 h-5" />
+                  {files.map((file) => {
+                    // 添加防御性检查
+                    if (!file || !file.id) {
+                      console.warn('[CourseDetail] Invalid file object:', file);
+                      return null;
+                    }
+                    
+                    return (
+                      <div key={file.id} className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-md transition-all border border-transparent hover:border-gray-100 group">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
+                            <FileText className="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="font-medium text-gray-900 truncate pr-4" title={file.fileName || '未命名文件'}>
+                              {file.fileName || '未命名文件'}
+                            </h4>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(file.createdAt)} · {formatSize(file.fileSize)}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <h4 className="font-medium text-gray-900 truncate pr-4" title={file.fileName}>{file.fileName}</h4>
-                          <p className="text-xs text-muted-foreground">{formatDate(file.createdAt)} · {formatSize(file.fileSize)}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => handleViewSummary(file)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-600 text-xs font-bold hover:bg-indigo-100 transition-colors whitespace-nowrap"
-                        >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          AI 总结
-                        </button>
                         
-                        <a 
-                          href={file.downloadUrl} 
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
-                          title="下载文件"
-                        >
-                          <Download className="w-4 h-4" />
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => handleViewSummary(file)}
+                            disabled={!file.canvasFileId}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-600 text-xs font-bold hover:bg-indigo-100 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={!file.canvasFileId ? '文件 ID 缺失，无法分析' : 'AI 分析文件内容'}
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            AI 总结
+                          </button>
+                          
+                          {file.downloadUrl && (
+                            <a 
+                              href={file.downloadUrl} 
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
+                              title="下载文件"
+                            >
+                              <Download className="w-4 h-4" />
+                            </a>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
-                  暂无文件同步记录
+                  {isSyncing ? '正在同步文件...' : '暂无文件同步记录'}
                 </div>
               )}
             </CardContent>
