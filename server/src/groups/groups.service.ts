@@ -14,15 +14,35 @@ export class GroupsService {
    */
   private async getUserByToken(accessToken: string) {
     const profile = await this.canvas.getUserProfile(accessToken);
-    const email = profile.primary_email || profile.login_id || `canvas_user_${profile.id}@example.com`;
+    const canvasId = profile.id ? String(profile.id) : null;
     
-    let user = await this.prisma.user.findUnique({ where: { email } });
+    if (!canvasId) {
+      throw new Error('无法获取 Canvas 用户 ID');
+    }
+    
+    // 优先通过 canvasId 查找用户
+    let user = await this.prisma.user.findFirst({ 
+      where: { canvasId } 
+    });
+    
     if (!user) {
+      // 如果找不到，创建新用户
+      const email = profile.primary_email || profile.login_id || `canvas_user_${canvasId}@example.com`;
       user = await this.prisma.user.create({
         data: {
           email,
           name: profile.name ?? null,
-          canvasId: profile.id ? String(profile.id) : null,
+          canvasId,
+          avatar: profile.avatar_url ?? null,
+        },
+      });
+    } else if (!user.avatar && profile.avatar_url) {
+      // 如果用户存在但缺少头像，更新头像
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          avatar: profile.avatar_url,
+          name: user.name || profile.name || null,
         },
       });
     }
@@ -167,6 +187,20 @@ export class GroupsService {
           select: {
             id: true,
             name: true,
+            email: true,
+            avatar: true,
+          }
+        },
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                avatar: true,
+              }
+            }
           }
         },
         _count: {
@@ -189,6 +223,13 @@ export class GroupsService {
       creator: group.creator,
       isActive: group.isActive,
       memberCount: group._count.members,
+      members: group.members.map(m => ({
+        id: m.id,
+        userId: m.userId,
+        role: m.role,
+        joinedAt: m.joinedAt,
+        user: m.user,
+      })),
       createdAt: group.createdAt,
     }));
   }

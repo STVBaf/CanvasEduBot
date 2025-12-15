@@ -149,7 +149,22 @@ export const api = {
       return [];
     }
   },
-  getGroups: async (): Promise<StudyGroup[]> => { const response = await apiClient.get<{ groups: StudyGroup[] }>('/groups/my'); return response.data.groups; },
+  // 获取用户加入的小组
+  getMyGroups: async (courseId?: string): Promise<StudyGroup[]> => { 
+    const url = courseId ? `/groups/my?courseId=${courseId}` : '/groups/my';
+    const response = await apiClient.get<{ groups: StudyGroup[] }>(url); 
+    return response.data.groups; 
+  },
+  // 获取课程的所有小组（对所有学生可见）
+  getCourseGroups: async (courseId: string): Promise<StudyGroup[]> => { 
+    const response = await apiClient.get<{ groups: StudyGroup[] }>(`/groups/course/${courseId}`); 
+    return response.data.groups; 
+  },
+  // 兼容旧接口（建议使用 getCourseGroups）
+  getGroups: async (): Promise<StudyGroup[]> => { 
+    const response = await apiClient.get<{ groups: StudyGroup[] }>('/groups/my'); 
+    return response.data.groups; 
+  },
   createGroup: async (params: CreateGroupParams): Promise<StudyGroup> => { const response = await apiClient.post<{ group: StudyGroup }>('/groups', params); return response.data.group; },
   leaveGroup: async (groupId: string): Promise<void> => { await apiClient.post(`/groups/${groupId}/leave`); },
   disbandGroup: async (groupId: string): Promise<void> => { await apiClient.delete(`/groups/${groupId}`); },

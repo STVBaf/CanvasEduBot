@@ -19,15 +19,21 @@ export class FilesService {
   async syncCourseFilesByToken(accessToken: string, courseId: string) {
     // 1. Get user info from Canvas to ensure we have a user record
     const profile = await this.canvas.getUserProfile(accessToken);
-    const email = profile.primary_email || profile.login_id || `canvas_user_${profile.id}@example.com`;
+    const canvasId = profile.id ? String(profile.id) : null;
     
-    // 2. Find or create user
-    let user = await this.prisma.user.findUnique({ where: { email } });
+    if (!canvasId) {
+      throw new Error('无法获取 Canvas 用户 ID');
+    }
+    
+    // 2. Find or create user by canvasId
+    let user = await this.prisma.user.findFirst({ where: { canvasId } });
     if (!user) {
+      const email = profile.primary_email || profile.login_id || `canvas_user_${canvasId}@example.com`;
       user = await this.prisma.user.create({
         data: {
           email,
           name: profile.name ?? null,
+          canvasId,
         },
       });
     }
@@ -113,9 +119,13 @@ export class FilesService {
   async getCourseFiles(accessToken: string, courseId: string) {
     // 1. 获取用户信息
     const profile = await this.canvas.getUserProfile(accessToken);
-    const email = profile.primary_email || profile.login_id || `canvas_user_${profile.id}@example.com`;
+    const canvasId = profile.id ? String(profile.id) : null;
     
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!canvasId) {
+      return [];
+    }
+    
+    const user = await this.prisma.user.findFirst({ where: { canvasId } });
     if (!user) {
       return [];
     }
@@ -152,9 +162,13 @@ export class FilesService {
   async getFileDetail(fileId: string, accessToken: string) {
     // 验证用户
     const profile = await this.canvas.getUserProfile(accessToken);
-    const email = profile.primary_email || profile.login_id || `canvas_user_${profile.id}@example.com`;
+    const canvasId = profile.id ? String(profile.id) : null;
     
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!canvasId) {
+      return null;
+    }
+    
+    const user = await this.prisma.user.findFirst({ where: { canvasId } });
     if (!user) {
       return null;
     }
