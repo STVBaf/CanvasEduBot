@@ -37,9 +37,9 @@ export class FilesController {
 
   /**
    * 获取课程文件列表（直接从 Canvas 获取，不需要同步）
-   * GET /api/files/canvas/course/:courseId
+   * GET /api/files/course/:courseId/live
    */
-  @Get('canvas/course/:courseId')
+  @Get('course/:courseId/live')
   async getCourseFilesFromCanvas(
     @Param('courseId') courseId: string,
     @GetToken() token: string

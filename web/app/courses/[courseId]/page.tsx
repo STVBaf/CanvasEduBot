@@ -2,37 +2,44 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-// import { api } from '@/lib/api'; 接后端
-
-//作业
-interface Assignment {
-  id: number;
-  name: string;
-  due_at: string | null; // DDL
-}
+import { api } from '@/lib/api';
+import type { Assignment } from '@/lib/types';
 
 export default function CourseDetailPage() {
   const params = useParams();
-  const courseId = params.courseId; // 获取URL中的课程ID
+  const courseIdParam = Array.isArray(params.courseId) ? params.courseId[0] : params.courseId; // 获取URL中的课程ID
 
   const [aiSummary, setAiSummary] = useState("正在生成课程智能总结...");
-  
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-
   const [loading, setLoading] = useState(true);
 
-  //连接口的
-  /*useEffect(() => {
+  useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // 1. 获取 AI 总结
-        // const summaryData = await api.getCourseSummary(Number(courseId));
-        // setAiSummary(summaryData.content);
+        const numericCourseId = Number(courseIdParam);
+        if (!numericCourseId || Number.isNaN(numericCourseId)) {
+          setAiSummary("课程 ID 无效");
+          setAssignments([]);
+          return;
+        }
 
-        // 2. 获取作业列表
-        // const assignmentsData = await api.getCourseAssignments(Number(courseId));
-        // setAssignments(assignmentsData);
+        // 1) AI 课程总结
+        const summary = await api.generateCourseSummary(numericCourseId).catch(() => null);
+        if (summary?.content) {
+          setAiSummary(summary.content);
+        } else {
+          setAiSummary("暂未生成课程总结，稍后重试。");
+        }
+
+        // 2) 作业列表（按 DDL 排序）
+        const data = await api.getCourseAssignments(numericCourseId);
+        const sorted = [...data].sort((a, b) => {
+          if (!a.dueAt) return 1;
+          if (!b.dueAt) return -1;
+          return new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime();
+        });
+        setAssignments(sorted);
       } catch (error) {
         console.error("获取课程详情失败", error);
         setAiSummary("获取总结失败，请稍后重试。");
@@ -40,32 +47,21 @@ export default function CourseDetailPage() {
         setLoading(false);
       }
     };
+
     fetchData();
-    */
+  }, [courseIdParam]);
 
-  useEffect(() => {
-    setTimeout(() => {
-      setAiSummary(`
-        【AI 课程助手总结】
-        (这里是预留给 Agent 输出的区域)
-      `);
-    });
+  const renderStatus = (work: Assignment) => {
+    if (work.hasSubmitted || work.submissionStatus === 'submitted') {
+      return <span className="text-green-700 bg-green-100 px-2 py-1 rounded-full text-xs">已提交</span>;
+    }
 
-    const mockAssignments = [
-      { id: 1, name: '期末大作业', due_at: '2025-12-20T23:59:00' },
-      { id: 2, name: '第一次平时作业', due_at: '2025-09-15T23:59:00' },
-      { id: 3, name: '小组汇报PPT', due_at: '2025-10-01T12:00:00' },
-      { id: 4, name: '未设置DDL的练习', due_at: null },//假数据
-    ];
+    if (work.dueAt && new Date(work.dueAt).getTime() < Date.now()) {
+      return <span className="text-red-700 bg-red-100 px-2 py-1 rounded-full text-xs">已截止</span>;
+    }
 
-    const sorted = mockAssignments.sort((a, b) => {
-      if (!a.due_at) return 1;
-      if (!b.due_at) return -1;
-      return new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
-    });
-
-    setAssignments(sorted);
-  }, []);
+    return <span className="text-amber-700 bg-amber-100 px-2 py-1 rounded-full text-xs">进行中</span>;
+  };
 
   return (
     <div className="container mx-auto py-8 px-4 space-y-8">
@@ -73,9 +69,9 @@ export default function CourseDetailPage() {
         <Link href="/courses" className="text-gray-500 hover:text-gray-900">
           &larr; 返回课程列表
         </Link>
-        <h1 className="text-2xl font-bold">课程详情 (ID: {courseId})</h1>
+        <h1 className="text-2xl font-bold">课程详情 (ID: {courseIdParam})</h1>
         <Link 
-          href={`/courses/${courseId}/groups`}
+          href={`/courses/${courseIdParam}/groups`}
           className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
         >
           进入分组协作 &rarr;
@@ -90,34 +86,37 @@ export default function CourseDetailPage() {
       </section>
 
       <section>
-        <h2 className="text-xl font-bold text-gray-900 mb-4">📅 作业列表 (按 DDL 排序)</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900">📅 作业列表 (按 DDL 排序)</h2>
+          {loading && <span className="text-sm text-gray-500">加载中...</span>}
+        </div>
         <div className="bg-white border rounded-lg overflow-hidden shadow-sm">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">作业名称</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">截止时间 (DDL)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {assignments.map((work) => (
-                <tr key={work.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{work.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {work.due_at ? new Date(work.due_at).toLocaleString() : '无截止日期'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {work.due_at && new Date(work.due_at) < new Date() ? (
-                      <span className="text-red-600 bg-red-100 px-2 py-1 rounded-full text-xs">已截止</span>
-                    ) : (
-                      <span className="text-green-600 bg-green-100 px-2 py-1 rounded-full text-xs">进行中</span>
-                    )}
-                  </td>
+          {assignments.length === 0 ? (
+            <div className="p-6 text-gray-500">暂无作业</div>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">作业名称</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">截止时间 (DDL)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {assignments.map((work) => (
+                  <tr key={work.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{work.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {work.dueAt ? new Date(work.dueAt).toLocaleString() : '无截止日期'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {renderStatus(work)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </section>
     </div>

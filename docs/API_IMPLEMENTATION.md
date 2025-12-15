@@ -77,9 +77,9 @@ Authorization: Bearer YOUR_CANVAS_ACCESS_TOKEN
 }
 ```
 
-### 3.2 获取课程文件列表（从 Canvas）
+### 3.2 获取课程文件列表（实时 Canvas）
 
-**接口：** `GET /api/files/canvas/course/:courseId`
+**接口：** `GET /api/files/course/:courseId/live`
 
 **描述：** 直接从 Canvas API 获取指定课程的所有文件列表（实时数据，无需同步）
 
@@ -190,6 +190,11 @@ Content-Length: 1024000
 
 ## 4. 学习小组相关接口
 
+> 可见性提示：
+> - 所有学生可通过 `GET /api/groups/course/:courseId` 查看该课程的**全部**活跃小组（与“只能看到自己的小组”问题相对）。
+> - `GET /api/groups/my` 仅返回当前用户加入的小组。
+> - 用户身份以 Canvas `canvasId` 作为唯一标识；请确保后端与数据库已切换为 `canvasId` 查找用户（避免因邮箱变化导致的多账号看不到彼此小组的情况）。
+
 ### 4.1 创建小组
 
 **接口：** `POST /api/groups`
@@ -279,7 +284,7 @@ Content-Length: 1024000
 
 **接口：** `GET /api/groups/course/:courseId`
 
-**描述：** 获取指定课程的所有活跃小组（公开列表）
+**描述：** 获取指定课程的所有活跃小组（公开列表，所有学生可见）。返回成员列表用于前端显示和“我是否已加入”判断。
 
 **路径参数：**
 - `courseId`: 课程 ID
