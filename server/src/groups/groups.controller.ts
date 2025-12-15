@@ -36,6 +36,20 @@ export class GroupsController {
   }
 
   /**
+   * 获取所有课程的所有小组（全局公开列表）
+   * GET /api/groups/all
+   */
+  @Get('all')
+  async getAllGroups(@GetToken() token: string) {
+    const groups = await this.groupsService.getAllGroups(token);
+
+    return {
+      groups,
+      total: groups.length,
+    };
+  }
+
+  /**
    * 获取用户加入的所有小组
    * GET /api/groups/my
    */

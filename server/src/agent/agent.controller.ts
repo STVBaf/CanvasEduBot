@@ -93,6 +93,23 @@ import {
      */
     private async collectCourseContent(accessToken: string, courseId: string): Promise<string> {
       const parts: string[] = [];
+
+      // 统一的截断工具，避免 Coze 输入过长
+      const truncate = (text: string, max: number) => {
+        if (!text) return '';
+        return text.length <= max ? text : `${text.slice(0, max)}...`;
+      };
+
+      // 最终组装时控制总长（优先级：课程简介/大纲 > 作业 > 大纲引用文件 > 文件名）
+      const appendWithBudget = (arr: string[], budget: { remain: number }, chunk: string) => {
+        if (!chunk) return;
+        const safe = truncate(chunk, budget.remain);
+        if (safe.length === 0) return;
+        arr.push(safe);
+        budget.remain -= safe.length;
+      };
+
+      const budget = { remain: 3800 }; // 留出提示词空间，避免被 generateSummary 再截断
   
       try {
         // 1. 获取课程基本信息
@@ -100,48 +117,77 @@ import {
         const course = courses.find((c: any) => String(c.id) === String(courseId));
         
         if (course) {
-          parts.push(`课程名称: ${course.name || '未知'}`);
-          parts.push(`课程代码: ${course.course_code || '未知'}`);
+          appendWithBudget(parts, budget, `课程名称: ${course.name || '未知'}`);
+          appendWithBudget(parts, budget, `课程代码: ${course.course_code || '未知'}`);
           if (course.description) {
-            parts.push(`课程描述: ${course.description}`);
+            const cleanDesc = course.description
+              .replace(/<[^>]*>/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+            appendWithBudget(parts, budget, `课程描述: ${truncate(cleanDesc, 300)}`);
           }
-          parts.push('\n');
+          appendWithBudget(parts, budget, '\n');
         }
   
         // 2. 获取作业信息
         try {
           const assignments = await this.assignmentsService.getCourseAssignments(accessToken, courseId);
-          if (assignments.length > 0) {
-            parts.push('=== 作业列表 ===');
-            assignments.forEach((assignment: any) => {
-              parts.push(`作业: ${assignment.name}`);
-              if (assignment.description) {
-                // 移除 HTML 标签，只保留文本
+          if (assignments.length > 0 && budget.remain > 0) {
+            appendWithBudget(parts, budget, '=== 作业列表（最多8条，含描述摘要） ===');
+            assignments.slice(0, 8).forEach((assignment: any) => {
+              appendWithBudget(parts, budget, `作业: ${assignment.name}`);
+              if (assignment.description && budget.remain > 0) {
                 const textDesc = assignment.description
                   .replace(/<[^>]*>/g, ' ')
                   .replace(/\s+/g, ' ')
                   .trim();
                 if (textDesc) {
-                  parts.push(`  描述: ${textDesc.substring(0, 200)}`);
+                  appendWithBudget(parts, budget, `  描述: ${truncate(textDesc, 200)}`);
                 }
               }
-              if (assignment.dueAt) {
-                parts.push(`  截止时间: ${assignment.dueAt}`);
+              if (assignment.dueAt && budget.remain > 0) {
+                appendWithBudget(parts, budget, `  截止时间: ${assignment.dueAt}`);
               }
-              parts.push('');
+              appendWithBudget(parts, budget, '');
             });
           }
         } catch (error: any) {
           this.logger.warn(`获取作业信息失败: ${error?.message || error}`);
         }
   
-        // 3. 获取文件信息（可选，只获取文件名）
+        // 3. 获取课程大纲（syllabus）
+        try {
+          this.logger.log(`尝试获取课程 ${courseId} 的大纲...`);
+          const syllabus = await this.canvasService.getCourseSyllabus(accessToken, courseId);
+          if (syllabus?.text) {
+            this.logger.log(`✅ 课程大纲获取成功，文本长度: ${syllabus.text.length}，引用文件: ${syllabus.files?.length || 0}`);
+            appendWithBudget(parts, budget, '=== 课程大纲（精简） ===');
+            appendWithBudget(parts, budget, truncate(syllabus.text, 1500));
+            appendWithBudget(parts, budget, '');
+          } else {
+            this.logger.warn(`⚠️  课程 ${courseId} 的大纲为空`);
+          }
+
+          if (syllabus?.files?.length) {
+            appendWithBudget(parts, budget, '=== 大纲引用文件（最多5个）===');
+            syllabus.files.forEach((file) => {
+              if (budget.remain <= 0) return;
+              appendWithBudget(parts, budget, `文件: ${file.name} (ID: ${file.id}${file.url ? `, URL: ${file.url}` : ''})`);
+            });
+            appendWithBudget(parts, budget, '');
+          }
+        } catch (error: any) {
+          this.logger.warn(`获取课程大纲失败: ${error?.message || error}`);
+        }
+
+        // 4. 获取文件信息（只取文件名，最多20个）
         try {
           const files = await this.filesService.getCourseFilesFromCanvas(accessToken, courseId);
-          if (files.length > 0) {
-            parts.push('=== 课程文件 ===');
+          if (files.length > 0 && budget.remain > 0) {
+            appendWithBudget(parts, budget, '=== 课程文件（最多20个文件名）===');
             files.slice(0, 20).forEach((file: any) => {
-              parts.push(`文件: ${file.displayName || file.fileName}`);
+              if (budget.remain <= 0) return;
+              appendWithBudget(parts, budget, `文件: ${file.displayName || file.fileName}`);
             });
           }
         } catch (error: any) {
@@ -153,7 +199,7 @@ import {
         if (fullText.trim().length === 0) {
           return `课程ID: ${courseId} 的相关信息`;
         }
-  
+
         return fullText;
       } catch (error: any) {
         this.logger.error(`收集课程内容失败: ${error?.message || error}`);

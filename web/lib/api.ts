@@ -50,12 +50,21 @@ export const api = {
   getFileSummary: async (fileId: string): Promise<FileSummary> => { console.warn("API for getFileSummary is mocked!"); return new Promise((resolve) => { setTimeout(() => { resolve({ fileId, summary: "这份文档主要介绍了课程的核心概念...", keyPoints: ["要点1", "要点2"], actionItems: ["复习", "练习"] }); }, 1500); }); },
   getCourseFiles: async (courseId: string | number): Promise<CourseFile[]> => { 
     try {
+      // 首选已同步的数据库文件
       const response = await apiClient.get<{ courseId: string, files: CourseFile[], total: number }>(`/files/course/${courseId}`);
       console.log('[API] getCourseFiles response for course', courseId, ':', response.data);
       
-      if (response.data && Array.isArray(response.data.files)) {
-        console.log('[API] getCourseFiles: Found', response.data.files.length, 'files');
+      if (response.data && Array.isArray(response.data.files) && response.data.files.length > 0) {
+        console.log('[API] getCourseFiles: Found', response.data.files.length, 'files (synced)');
         return response.data.files;
+      }
+      
+      // Fallback: 直接从 Canvas 实时获取
+      console.log('[API] getCourseFiles: Synced files empty, fallback to live Canvas fetch');
+      const liveRes = await apiClient.get<{ courseId: string, files: CourseFile[], total: number }>(`/files/course/${courseId}/live`);
+      if (liveRes.data && Array.isArray(liveRes.data.files)) {
+        console.log('[API] getCourseFiles: Live fetch returned', liveRes.data.files.length, 'files');
+        return liveRes.data.files;
       }
       
       // Fallback: try direct array
@@ -149,7 +158,27 @@ export const api = {
       return [];
     }
   },
-  getGroups: async (): Promise<StudyGroup[]> => { const response = await apiClient.get<{ groups: StudyGroup[] }>('/groups/my'); return response.data.groups; },
+  // 获取用户加入的小组
+  getMyGroups: async (courseId?: string): Promise<StudyGroup[]> => { 
+    const url = courseId ? `/groups/my?courseId=${courseId}` : '/groups/my';
+    const response = await apiClient.get<{ groups: StudyGroup[] }>(url); 
+    return response.data.groups; 
+  },
+  // 获取所有课程的所有小组（全局公开列表，用于浏览和加入）
+  getAllGroups: async (): Promise<StudyGroup[]> => { 
+    const response = await apiClient.get<{ groups: StudyGroup[] }>('/groups/all'); 
+    return response.data.groups; 
+  },
+  // 获取课程的所有小组（对所有学生可见）
+  getCourseGroups: async (courseId: string): Promise<StudyGroup[]> => { 
+    const response = await apiClient.get<{ groups: StudyGroup[] }>(`/groups/course/${courseId}`); 
+    return response.data.groups; 
+  },
+  // 兼容旧接口（建议使用 getCourseGroups）
+  getGroups: async (): Promise<StudyGroup[]> => { 
+    const response = await apiClient.get<{ groups: StudyGroup[] }>('/groups/my'); 
+    return response.data.groups; 
+  },
   createGroup: async (params: CreateGroupParams): Promise<StudyGroup> => { const response = await apiClient.post<{ group: StudyGroup }>('/groups', params); return response.data.group; },
   leaveGroup: async (groupId: string): Promise<void> => { await apiClient.post(`/groups/${groupId}/leave`); },
   disbandGroup: async (groupId: string): Promise<void> => { await apiClient.delete(`/groups/${groupId}`); },
