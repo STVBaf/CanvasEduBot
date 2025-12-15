@@ -49,6 +49,7 @@ export class FilesService {
       const fileMeta = await this.prisma.fileMeta.upsert({
         where: { canvasFileId: String(f.id) },
         update: {
+          userId,
           fileName: f.display_name ?? f.filename,
           downloadUrl: f.url,
           courseId: String(courseId),

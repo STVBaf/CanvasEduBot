@@ -157,11 +157,15 @@ import {
   
         // 3. 获取课程大纲（syllabus）
         try {
+          this.logger.log(`尝试获取课程 ${courseId} 的大纲...`);
           const syllabus = await this.canvasService.getCourseSyllabus(accessToken, courseId);
           if (syllabus?.text) {
+            this.logger.log(`✅ 课程大纲获取成功，文本长度: ${syllabus.text.length}，引用文件: ${syllabus.files?.length || 0}`);
             appendWithBudget(parts, budget, '=== 课程大纲（精简） ===');
             appendWithBudget(parts, budget, truncate(syllabus.text, 1500));
             appendWithBudget(parts, budget, '');
+          } else {
+            this.logger.warn(`⚠️  课程 ${courseId} 的大纲为空`);
           }
 
           if (syllabus?.files?.length) {

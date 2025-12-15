@@ -187,6 +187,7 @@ export class CanvasService {
 	 */
 	async getCourseSyllabus(accessToken: string, courseId: string) {
 		const cleanToken = accessToken.trim();
+		this.logger.log(`正在获取课程 ${courseId} 的大纲...`);
 		try {
 			const res = await axios.get(`${this.baseUrl}/api/v1/courses/${courseId}`, {
 				headers: { Authorization: `Bearer ${cleanToken}` },
@@ -196,6 +197,7 @@ export class CanvasService {
 			});
 
 			const rawHtml: string = res.data?.syllabus_body || '';
+			this.logger.log(`课程 ${courseId} 大纲获取成功，HTML长度: ${rawHtml.length}`);
 			const cleanText = rawHtml
 				.replace(/<br\s*\/?>(?=\s*\n?)/gi, '\n')
 				.replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
@@ -220,6 +222,7 @@ export class CanvasService {
 				}
 			}
 
+			this.logger.log(`课程 ${courseId} 大纲处理完成 - 纯文本: ${cleanText.length}字符, 引用文件: ${fileMetas.length}个`);
 			return {
 				rawHtml,
 				text: cleanText,
@@ -228,6 +231,7 @@ export class CanvasService {
 				courseCode: res.data?.course_code,
 			};
 		} catch (error) {
+			this.logger.error(`获取课程 ${courseId} 大纲失败: ${error?.message || error}`);
 			if (axios.isAxiosError(error)) {
 				this.logger.error(`Failed to fetch course syllabus: ${error.response?.status} - ${error.message}`);
 			}
