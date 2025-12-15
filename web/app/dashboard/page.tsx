@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BookOpen, Users, BrainCircuit, ArrowRight, Calendar as CalendarIcon, Loader2, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
-import type { Course, StudyGroup, Assignment } from '@/lib/types';
+import type { Course, StudyGroup, Assignment, User } from '@/lib/types';
 
 // Helper to assign colors to courses
 const getCourseColor = (index: number) => {
@@ -14,6 +14,7 @@ const getCourseColor = (index: number) => {
 };
 
 export default function DashboardPage() {
+  const [user, setUser] = useState<User | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [myGroups, setMyGroups] = useState<StudyGroup[]>([]);
   const [urgentDeadlines, setUrgentDeadlines] = useState<Assignment[]>([]);
@@ -27,6 +28,10 @@ export default function DashboardPage() {
       try {
         setLoading(true);
         console.log('[Dashboard] Fetching data...');
+        
+        // Fetch user info
+        const userData = await api.getMe();
+        setUser(userData);
         
         // Fetch courses first
         const coursesData = await api.getCourses();
@@ -162,7 +167,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">你好, 同学! </h1>
+          <h1 className="text-3xl font-bold text-foreground">你好，{user?.name || '同学'}！</h1>
           <p className="text-muted-foreground mt-1">准备好开始今天的学习了吗？</p>
         </div>
         <div className="flex gap-4">
