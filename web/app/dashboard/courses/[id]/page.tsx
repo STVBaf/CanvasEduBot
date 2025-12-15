@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bot, Calendar, FileText, ArrowLeft, Sparkles, X, Loader2, Download, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { api } from '@/lib/api';
 import type { FileSummary, CourseFile, Assignment } from '@/lib/types';
 
@@ -18,11 +19,20 @@ export default function CourseDetailPage() {
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [currentSummary, setCurrentSummary] = useState<FileSummary | null>(null);
   const [selectedFileName, setSelectedFileName] = useState('');
+  const [aiSummaryContent, setAiSummaryContent] = useState<string>('');
+  const [summaryError, setSummaryError] = useState<string>('');
 
   // 数据状态
   const [files, setFiles] = useState<CourseFile[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('');
+  
+  // 课程总结状态
+  const [courseSummary, setCourseSummary] = useState<string>('');
+  const [isLoadingCourseSummary, setIsLoadingCourseSummary] = useState(false);
+  const [courseSummaryError, setCourseSummaryError] = useState<string>('');
 
   // 获取真实数据
   useEffect(() => {
@@ -41,7 +51,19 @@ export default function CourseDetailPage() {
         console.log('[CourseDetail] Files:', filesResponse);
         console.log('[CourseDetail] Assignments:', assignmentsResponse);
         
+        // Log first file to check structure
+        if (Array.isArray(filesResponse) && filesResponse.length > 0) {
+          console.log('[CourseDetail] First file structure:', filesResponse[0]);
+          console.log('[CourseDetail] First file canvasFileId:', filesResponse[0].canvasFileId);
+        }
+        
         setFiles(Array.isArray(filesResponse) ? filesResponse : []);
+        
+        // 如果数据库中没有文件，自动触发同步
+        if (!filesResponse || filesResponse.length === 0) {
+          console.log('[CourseDetail] No files found in database, triggering auto-sync...');
+          await handleAutoSync();
+        }
         
         // Sort assignments by due date (earliest first)
         if (Array.isArray(assignmentsResponse)) {
@@ -67,19 +89,86 @@ export default function CourseDetailPage() {
 
     fetchData();
   }, [courseId]);
+  
+  // 自动同步文件
+  const handleAutoSync = async () => {
+    if (isSyncing) return;
+    
+    setIsSyncing(true);
+    setSyncMessage('正在同步课程文件...');
+    
+    try {
+      console.log('[CourseDetail] Starting auto file sync for course:', courseId);
+      const result = await api.syncCourseFiles(courseId);
+      console.log('[CourseDetail] Sync result:', result);
+      
+      setSyncMessage('文件同步成功，正在刷新...');
+      
+      // 等待 2 秒让后台任务处理
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // 重新获取文件列表
+      const filesResponse = await api.getCourseFiles(courseId);
+      console.log('[CourseDetail] Files after sync:', filesResponse);
+      setFiles(Array.isArray(filesResponse) ? filesResponse : []);
+      
+      setSyncMessage('');
+    } catch (error: any) {
+      console.error('[CourseDetail] Auto sync failed:', error);
+      setSyncMessage('自动同步失败，您可以稍后手动同步');
+      setTimeout(() => setSyncMessage(''), 3000);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
-  // 获取 AI 总结
+  // 生成课程总结
+  const handleGenerateCourseSummary = async () => {
+    setIsLoadingCourseSummary(true);
+    setCourseSummaryError('');
+    
+    try {
+      console.log('[CourseDetail] Generating course summary for:', courseId);
+      const result = await api.generateCourseSummary(courseId, '7582959222351167524');
+      console.log('[CourseDetail] Course summary result:', result);
+      console.log('[CourseDetail] Course summary content type:', typeof result.content);
+      console.log('[CourseDetail] Course summary content preview:', result.content.substring(0, 200));
+      setCourseSummary(result.content);
+      console.log('[CourseDetail] Course summary generated successfully');
+    } catch (error: any) {
+      console.error('[CourseDetail] Failed to generate course summary:', error);
+      setCourseSummaryError(error.response?.data?.message || error.message || '生成课程总结失败');
+    } finally {
+      setIsLoadingCourseSummary(false);
+    }
+  };
+  
+  // 获取 AI 文件分析
   const handleViewSummary = async (file: CourseFile) => {
     setSelectedFileName(file.fileName);
     setIsModalOpen(true);
     setIsLoadingSummary(true);
-    setCurrentSummary(null);
+    setAiSummaryContent('');
+    setSummaryError('');
 
     try {
-      const data = await api.getFileSummary(file.id);
-      setCurrentSummary(data);
-    } catch (error) {
-      console.error("Failed to fetch summary", error);
+      console.log('[CourseDetail] File object:', file);
+      console.log('[CourseDetail] Analyzing file - ID:', file.canvasFileId, 'Name:', file.fileName);
+      console.log('[CourseDetail] File ID type:', typeof file.canvasFileId);
+      
+      if (!file.canvasFileId) {
+        throw new Error('文件 ID 缺失，无法进行分析');
+      }
+      
+      const result = await api.analyzeCanvasFile(file.canvasFileId, '7582988139266998307');
+      console.log('[CourseDetail] File analysis result:', result);
+      console.log('[CourseDetail] File analysis content type:', typeof result.content);
+      console.log('[CourseDetail] File analysis content preview:', result.content.substring(0, 200));
+      setAiSummaryContent(result.content);
+      console.log('[CourseDetail] File analysis completed');
+    } catch (error: any) {
+      console.error('[CourseDetail] Failed to analyze file:', error);
+      setSummaryError(error.response?.data?.message || error.message || '文件分析失败');
     } finally {
       setIsLoadingSummary(false);
     }
@@ -145,24 +234,65 @@ export default function CourseDetailPage() {
           <motion.div variants={item}>
           <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-none overflow-hidden">
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-indigo-900">
-                <Bot className="w-6 h-6" />
-                智能助教总结
+              <CardTitle className="flex items-center justify-between text-indigo-900">
+                <div className="flex items-center gap-2">
+                  <Bot className="w-6 h-6" />
+                  智能助教总结
+                </div>
+                {!courseSummary && !isLoadingCourseSummary && (
+                  <button
+                    onClick={handleGenerateCourseSummary}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    生成总结
+                  </button>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 min-h-[200px] flex items-center justify-center border border-indigo-100/50">
-                <div className="text-center space-y-3">
-                  <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto animate-pulse">
-                    <Bot className="w-6 h-6 text-indigo-600" />
+              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 min-h-[200px] border border-indigo-100/50">
+                {isLoadingCourseSummary ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                    <p className="ml-3 text-indigo-900 font-medium">AI 正在分析课程内容...</p>
                   </div>
-                  <h3 className="font-medium text-indigo-900">AI 正在分析课程内容...</h3>
-                  <p className="text-sm text-indigo-600/80 max-w-xs mx-auto">
-                    此区域将展示课程进度的智能摘要、重点知识提醒以及个性化学习建议。
-                    <br/>
-                    (功能开发中)
-                  </p>
-                </div>
+                ) : courseSummaryError ? (
+                  <div className="text-center space-y-3">
+                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                      <X className="w-6 h-6 text-red-600" />
+                    </div>
+                    <h3 className="font-medium text-red-900">生成失败</h3>
+                    <p className="text-sm text-red-600/80">{courseSummaryError}</p>
+                    <button
+                      onClick={handleGenerateCourseSummary}
+                      className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                    >
+                      重试
+                    </button>
+                  </div>
+                ) : courseSummary ? (
+                  <div>
+                    <MarkdownRenderer content={courseSummary} className="text-gray-800" />
+                    <button
+                      onClick={handleGenerateCourseSummary}
+                      className="mt-4 text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      重新生成
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-center space-y-3">
+                    <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto">
+                      <Bot className="w-6 h-6 text-indigo-600" />
+                    </div>
+                    <h3 className="font-medium text-indigo-900">点击"生成总结"开始</h3>
+                    <p className="text-sm text-indigo-600/80 max-w-xs mx-auto">
+                      AI 将为你分析课程作业、文件等信息，生成课程进度的智能摘要和学习建议。
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -177,6 +307,14 @@ export default function CourseDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {/* 同步状态提示 */}
+              {syncMessage && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2">
+                  {isSyncing && <Loader2 className="w-4 h-4 animate-spin text-blue-600" />}
+                  <span className="text-sm text-blue-700">{syncMessage}</span>
+                </div>
+              )}
+              
               {isLoadingData ? (
                 <div className="space-y-4">
                   {[1, 2, 3].map(i => <div key={i} className="h-16 bg-gray-100 rounded-2xl animate-pulse" />)}
@@ -244,14 +382,26 @@ export default function CourseDetailPage() {
                 <div className="space-y-4">
                   {assignments.map((assignment) => (
                     <div key={assignment.id} className="flex items-start gap-4 p-4 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors group">
-                      <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${!assignment.hasSubmittedSubmissions ? 'bg-orange-500' : 'bg-green-500'}`}></div>
+                      <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${assignment.hasSubmitted ? 'bg-green-500' : assignment.isOverdue ? 'bg-red-500' : 'bg-orange-500'}`}></div>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-bold text-sm text-gray-900 truncate" title={assignment.name}>{assignment.name}</h4>
                         <p className="text-xs text-muted-foreground mt-1">截止: {formatDueDate(assignment.dueAt)}</p>
                       </div>
-                      {!assignment.hasSubmittedSubmissions && (
+                      {assignment.submissionStatus === 'graded' ? (
+                        <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-1 rounded-full whitespace-nowrap">
+                          {assignment.score !== null ? `${assignment.score}/${assignment.pointsPossible || '-'}` : '已评分'}
+                        </span>
+                      ) : assignment.hasSubmitted ? (
+                        <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-full whitespace-nowrap">
+                          已提交
+                        </span>
+                      ) : assignment.isOverdue ? (
+                        <span className="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-1 rounded-full whitespace-nowrap">
+                          已逾期
+                        </span>
+                      ) : (
                         <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-1 rounded-full whitespace-nowrap">
-                          进行中
+                          未完成
                         </span>
                       )}
                       {assignment.htmlUrl && (
@@ -274,11 +424,72 @@ export default function CourseDetailPage() {
 
       {/* AI 总结弹窗 */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setIsModalOpen(false)}>
           <div 
             className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* 弹窗头部 */}
+            <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-purple-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">AI 文件分析</h2>
+                  <p className="text-sm text-gray-600 truncate max-w-md" title={selectedFileName}>{selectedFileName}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="w-10 h-10 rounded-full hover:bg-gray-100 transition-colors flex items-center justify-center text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 弹窗内容 */}
+            <div className="flex-1 overflow-y-auto p-8">
+              {isLoadingSummary ? (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mb-4" />
+                  <p className="text-gray-600 font-medium">AI 正在分析文件内容...</p>
+                  <p className="text-sm text-gray-400 mt-2">这可能需要一些时间，请稍候</p>
+                </div>
+              ) : summaryError ? (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                    <X className="w-8 h-8 text-red-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">分析失败</h3>
+                  <p className="text-sm text-gray-600 mb-4">{summaryError}</p>
+                  <button
+                    onClick={() => setIsModalOpen(false)}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    关闭
+                  </button>
+                </div>
+              ) : aiSummaryContent ? (
+                <MarkdownRenderer content={aiSummaryContent} className="text-gray-800" />
+              ) : (
+                <div className="text-center py-16 text-gray-400">
+                  暂无分析结果
+                </div>
+              )}
+            </div>
+
+            {/* 弹窗底部 */}
+            {!isLoadingSummary && aiSummaryContent && (
+              <div className="px-8 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                >
+                  关闭
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

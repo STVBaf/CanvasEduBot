@@ -78,11 +78,17 @@ export interface Assignment {
   lockAt?: string | null;
   pointsPossible?: number;
   submissionTypes?: string[];
-  hasSubmittedSubmissions: boolean;
+  hasSubmitted: boolean;
+  submissionStatus?: string;
+  submittedAt?: string | null;
+  grade?: string | null;
+  score?: number | null;
+  isOverdue?: boolean;
+  isUrgent?: boolean;
   htmlUrl?: string;
   courseId: string;
   courseName?: string;
   daysUntilDue?: number;
   hoursUntilDue?: number;
-  urgency?: string;
+  allowedExtensions?: string[];
 }

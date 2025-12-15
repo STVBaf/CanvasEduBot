@@ -67,7 +67,8 @@ export default function SchedulePage() {
         console.log('[Schedule] Sorted assignments:', sortedAssignments.length);
         console.log('[Schedule] Sample assignment data:', sortedAssignments.slice(0, 3).map(a => ({
           name: a.name,
-          hasSubmittedSubmissions: a.hasSubmittedSubmissions,
+          hasSubmitted: a.hasSubmitted,
+          submissionStatus: a.submissionStatus,
           dueAt: a.dueAt
         })));
         setAssignments(sortedAssignments);
@@ -141,7 +142,7 @@ export default function SchedulePage() {
 
   const filteredAssignments = assignments.filter(assign => {
     // 筛选未完成的作业
-    if (showPendingOnly && assign.hasSubmittedSubmissions) return false;
+    if (showPendingOnly && assign.hasSubmitted) return false;
     
     // 筛选未截止的作业
     if (showOnlyNotOverdue) {
@@ -198,7 +199,29 @@ export default function SchedulePage() {
                       ) : filteredAssignments.length > 0 ? (
                         filteredAssignments.map((assign, index) => (
                           <tr key={`${assign.courseId}-${assign.id}-${index}`} className="group hover:bg-gray-50/80 transition-colors">
-                            <td className="px-8 py-5 whitespace-nowrap">{assign.hasSubmittedSubmissions ? <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1 rounded-full w-fit"><CheckCircle2 className="w-4 h-4" /><span className="text-xs font-bold">已提交</span></div> : <div className="flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-1 rounded-full w-fit"><Circle className="w-4 h-4" /><span className="text-xs font-bold">进行中</span></div>}</td>
+                            <td className="px-8 py-5 whitespace-nowrap">
+                              {assign.submissionStatus === 'graded' ? (
+                                <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1 rounded-full w-fit">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  <span className="text-xs font-bold">{assign.score !== null ? `${assign.score}/${assign.pointsPossible || '-'}` : '已评分'}</span>
+                                </div>
+                              ) : assign.hasSubmitted ? (
+                                <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-3 py-1 rounded-full w-fit">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  <span className="text-xs font-bold">已提交</span>
+                                </div>
+                              ) : assign.isOverdue ? (
+                                <div className="flex items-center gap-2 text-red-600 bg-red-50 px-3 py-1 rounded-full w-fit">
+                                  <X className="w-4 h-4" />
+                                  <span className="text-xs font-bold">已逾期</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-1 rounded-full w-fit">
+                                  <Circle className="w-4 h-4" />
+                                  <span className="text-xs font-bold">进行中</span>
+                                </div>
+                              )}
+                            </td>
                             <td className="px-6 py-5"><span className="font-bold text-gray-900 group-hover:text-primary transition-colors text-base line-clamp-1" title={assign.name}>{assign.name}</span></td>
                             <td className="px-6 py-5"><div className="flex items-center gap-3"><div className={`w-10 h-10 rounded-full ${getCourseColor(assign.courseId).bg} flex items-center justify-center flex-shrink-0`}><BookOpen className={`w-5 h-5 ${getCourseColor(assign.courseId).text}`} /></div><div className="flex flex-col"><span className="text-sm font-bold text-gray-900">{getCourseCode(assign.courseId)}</span><span className="text-xs text-muted-foreground line-clamp-1" title={assign.courseName || getCourseName(assign.courseId)}>{assign.courseName || getCourseName(assign.courseId)}</span></div></div></td>
                             <td className="px-6 py-5 whitespace-nowrap"><div className="flex items-center gap-2 text-sm font-medium text-gray-700"><CalendarIcon className="w-4 h-4 text-gray-400" />{formatDisplayDate(assign.dueAt)}</div></td>
