@@ -77,7 +77,7 @@ export default function DashboardPage() {
         const now = new Date();
         const threeDaysLater = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
         const urgent = sortedAssignments.filter(a => {
-          if (!a.dueAt) return false;
+          if (!a.dueAt || a.hasSubmitted) return false;
           const dueDate = new Date(a.dueAt);
           return dueDate >= now && dueDate <= threeDaysLater;
         });
@@ -85,7 +85,7 @@ export default function DashboardPage() {
         
         // Extract today's assignments
         const today = sortedAssignments.filter(a => {
-          if (!a.dueAt) return false;
+          if (!a.dueAt || a.hasSubmitted) return false;
           const dueDate = new Date(a.dueAt);
           return dueDate.toDateString() === now.toDateString();
         });

@@ -6,6 +6,7 @@ import { User as UserIcon, Mail, Calendar, Shield, LogOut, Loader2, ExternalLink
 import { api } from '@/lib/api';
 import type { User } from '@/lib/types';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ProfilePage() {
@@ -222,15 +223,13 @@ export default function ProfilePage() {
                   <p className="text-sm text-gray-600 mb-4">
                     查看使用指南或联系技术支持
                   </p>
-                  <a 
-                    href="https://github.com" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
+                  <Link 
+                    href="/dashboard/user-guide"
                     className="flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700"
                   >
-                    访问帮助中心
+                    查看用户指南
                     <ExternalLink className="w-4 h-4" />
-                  </a>
+                  </Link>
                 </CardContent>
               </Card>
             </motion.div>

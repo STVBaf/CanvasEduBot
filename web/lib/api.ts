@@ -4,9 +4,15 @@ import type { Course, SyncResponse, FileSummary, StudyGroup, CreateGroupParams, 
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000/api';
 
+// Coze Bot ID 配置
+export const BOT_IDS = {
+  COURSE_SUMMARY: '7582959222351167524',      // 课程总结 Bot
+  FILE_ANALYSIS: '7582988139266998307',       // 文件分析 Bot
+} as const;
+
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  // timeout: 30000, // 取消默认超时限制，防止网络慢时报错
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -44,7 +50,7 @@ export const api = {
   getFileSummary: async (fileId: string): Promise<FileSummary> => { console.warn("API for getFileSummary is mocked!"); return new Promise((resolve) => { setTimeout(() => { resolve({ fileId, summary: "这份文档主要介绍了课程的核心概念...", keyPoints: ["要点1", "要点2"], actionItems: ["复习", "练习"] }); }, 1500); }); },
   getCourseFiles: async (courseId: string | number): Promise<CourseFile[]> => { 
     try {
-      const response = await apiClient.get<{ courseId: string, files: CourseFile[], total: number }>(`/files/canvas/course/${courseId}`);
+      const response = await apiClient.get<{ courseId: string, files: CourseFile[], total: number }>(`/files/course/${courseId}`);
       console.log('[API] getCourseFiles response for course', courseId, ':', response.data);
       
       if (response.data && Array.isArray(response.data.files)) {
@@ -71,11 +77,14 @@ export const api = {
       console.log('[API] getCourseAssignments response for course', courseId, ':', response.data);
       
       // Log first 3 assignments to see submission status
-      if (Array.isArray(response.data) && response.data.length > 0) {
+      const assignments = Array.isArray(response.data) ? response.data : (response.data as any).assignments;
+      
+      if (Array.isArray(assignments) && assignments.length > 0) {
         console.log('[API] getCourseAssignments sample assignments with submission status:');
-        response.data.slice(0, 3).forEach((a: any, i: number) => {
+        assignments.slice(0, 3).forEach((a: any, i: number) => {
           console.log(`  [${i}] ${a.name}:`);
-          console.log(`      - hasSubmittedSubmissions: ${a.hasSubmittedSubmissions}`);
+          console.log(`      - hasSubmitted: ${a.hasSubmitted}`);
+          console.log(`      - submissionStatus: ${a.submissionStatus}`);
           console.log(`      - dueAt: ${a.dueAt}`);
           console.log(`      - id: ${a.id}`);
         });
@@ -144,5 +153,29 @@ export const api = {
   createGroup: async (params: CreateGroupParams): Promise<StudyGroup> => { const response = await apiClient.post<{ group: StudyGroup }>('/groups', params); return response.data.group; },
   leaveGroup: async (groupId: string): Promise<void> => { await apiClient.post(`/groups/${groupId}/leave`); },
   disbandGroup: async (groupId: string): Promise<void> => { await apiClient.delete(`/groups/${groupId}`); },
-  joinGroup: async (groupId: string): Promise<void> => { await apiClient.post(`/groups/${groupId}/join`); }
+  joinGroup: async (groupId: string): Promise<void> => { await apiClient.post(`/groups/${groupId}/join`); },
+  
+  // Agent AI API
+  generateCourseSummary: async (courseId: string | number, botId?: string): Promise<{ content: string; courseId: string; botId: string; generatedAt: string }> => {
+    const response = await apiClient.post('/agent/summary', { courseId: String(courseId), botId });
+    return response.data;
+  },
+  
+  analyzeCanvasFile: async (fileId: string, botId?: string): Promise<{ content: string; fileId: string; fileName: string; botId: string; analyzedAt: string }> => {
+    const response = await apiClient.post(`/agent/analyze-ppt/${fileId}`, { botId });
+    return response.data;
+  },
+  
+  analyzeUploadedFile: async (file: File, botId?: string, prompt?: string): Promise<{ content: string; fileName: string; fileSize: number; mimeType: string; botId: string; analyzedAt: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (botId) formData.append('botId', botId);
+    if (prompt) formData.append('prompt', prompt);
+    
+    const response = await apiClient.post('/agent/analyze-file', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000, // 2 minutes for file upload
+    });
+    return response.data;
+  },
 };
