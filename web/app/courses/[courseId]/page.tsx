@@ -2,6 +2,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import type { Components } from 'react-markdown';
 import { api } from '@/lib/api';
 import type { Assignment } from '@/lib/types';
 
@@ -12,6 +15,37 @@ export default function CourseDetailPage() {
   const [aiSummary, setAiSummary] = useState("正在生成课程智能总结...");
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // 处理 AI 返回的 Markdown 内容，去除可能存在的代码块包裹
+  const cleanMarkdown = (text: string) => {
+    if (!text) return "";
+    let cleaned = text.trim();
+    
+    // 去除所有代码块标记（支持多种格式）
+    // 1. 去除开头的 ```markdown, ```md, ``` 等
+    cleaned = cleaned.replace(/^```(?:markdown|md)?\s*\n?/i, '');
+    // 2. 去除结尾的 ```
+    cleaned = cleaned.replace(/\n?```\s*$/i, '');
+    
+    return cleaned.trim();
+  };
+
+  // 自定义 Markdown 组件，禁止渲染代码块为 <pre><code>
+  const markdownComponents: Components = {
+    code: ({ node, className, children, ...props }) => {
+      const isInline = !className;
+      if (isInline) {
+        // 内联代码正常渲染
+        return <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props}>{children}</code>;
+      }
+      // 代码块作为纯文本渲染（防止 AI 返回的内容被包裹）
+      return <div className="whitespace-pre-wrap font-mono text-sm">{children}</div>;
+    },
+    pre: ({ children }) => {
+      // 如果遇到 <pre>，直接渲染子元素，不添加任何样式
+      return <>{children}</>;
+    },
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -80,8 +114,13 @@ export default function CourseDetailPage() {
 
       <section className="bg-gradient-to-r from-indigo-50 to-blue-50 p-6 rounded-xl border border-indigo-100">
         <h2 className="text-xl font-bold text-indigo-900 mb-3">🤖 AI 智能总结 (Agent Output)</h2>
-        <div className="bg-white p-4 rounded-lg shadow-sm text-gray-700 whitespace-pre-line min-h-[100px]">
-          {aiSummary}
+        <div className="bg-white p-4 rounded-lg shadow-sm min-h-[100px] prose prose-indigo max-w-none">
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm]}
+            components={markdownComponents}
+          >
+            {cleanMarkdown(aiSummary)}
+          </ReactMarkdown>
         </div>
       </section>
 

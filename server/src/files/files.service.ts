@@ -82,9 +82,9 @@ export class FilesService {
     // 格式化返回数据
     return files.map((file: any) => ({
       id: file.id,
-      displayName: file.display_name,
-      fileName: file.filename,
-      size: file.size,
+      displayName: file.display_name || file.filename,  // 优先使用 display_name
+      fileName: file.display_name || file.filename,      // 优先使用 display_name，去除数字前缀
+      size: file.size || 0,                            // 确保 size 字段正确
       contentType: file['content-type'] || file.content_type,
       url: file.url,
       createdAt: file.created_at,

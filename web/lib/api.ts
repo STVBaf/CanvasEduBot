@@ -61,10 +61,23 @@ export const api = {
       
       // Fallback: 直接从 Canvas 实时获取
       console.log('[API] getCourseFiles: Synced files empty, fallback to live Canvas fetch');
-      const liveRes = await apiClient.get<{ courseId: string, files: CourseFile[], total: number }>(`/files/course/${courseId}/live`);
+      const liveRes = await apiClient.get<{ courseId: string, files: any[], total: number }>(`/files/course/${courseId}/live`);
       if (liveRes.data && Array.isArray(liveRes.data.files)) {
         console.log('[API] getCourseFiles: Live fetch returned', liveRes.data.files.length, 'files');
-        return liveRes.data.files;
+        
+        // 🔑 映射 Canvas API 返回的字段到前端类型
+        const mappedFiles: CourseFile[] = liveRes.data.files.map((file: any) => ({
+          id: String(file.id),
+          canvasFileId: String(file.id),
+          fileName: file.fileName || file.displayName || file.filename,  // 优先使用 fileName (已经是 display_name)
+          fileSize: file.size || 0,  // 映射 size 到 fileSize
+          contentType: file.contentType || null,
+          downloadUrl: file.url || '',
+          status: 'available',
+          createdAt: file.createdAt || new Date().toISOString(),
+        }));
+        
+        return mappedFiles;
       }
       
       // Fallback: try direct array

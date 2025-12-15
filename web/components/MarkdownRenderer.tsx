@@ -2,6 +2,19 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Components } from 'react-markdown';
 
+// 清理 AI 返回的 Markdown 内容，去除代码块包裹
+const cleanMarkdown = (text: string): string => {
+  if (!text) return "";
+  let cleaned = text.trim();
+  
+  // 去除开头的 ```markdown, ```md, ``` 等
+  cleaned = cleaned.replace(/^```(?:markdown|md)?\s*\n?/i, '');
+  // 去除结尾的 ```
+  cleaned = cleaned.replace(/\n?```\s*$/i, '');
+  
+  return cleaned.trim();
+};
+
 const markdownComponents: Components = {
   h1: ({ children, ...props }) => (
     <h1 className="text-2xl font-bold mt-6 mb-4 text-gray-900" {...props}>
@@ -48,27 +61,26 @@ const markdownComponents: Components = {
       {children}
     </em>
   ),
-  code: ({ inline, children, ...props }: any) =>
-    inline ? (
-      <code
-        className="px-1.5 py-0.5 bg-gray-100 text-red-600 rounded text-sm font-mono"
-        {...props}
-      >
-        {children}
-      </code>
-    ) : (
-      <code
-        className="block p-4 bg-gray-900 text-gray-100 rounded-lg overflow-x-auto my-4 font-mono text-sm"
-        {...props}
-      >
-        {children}
-      </code>
-    ),
-  pre: ({ children, ...props }) => (
-    <pre className="my-4 overflow-x-auto" {...props}>
-      {children}
-    </pre>
-  ),
+  code: ({ node, className, children, ...props }: any) => {
+    const isInline = !className;
+    if (isInline) {
+      // 内联代码正常渲染
+      return (
+        <code
+          className="px-1.5 py-0.5 bg-gray-100 text-red-600 rounded text-sm font-mono"
+          {...props}
+        >
+          {children}
+        </code>
+      );
+    }
+    // 代码块不渲染为黑色背景，而是作为纯文本（防止 AI 返回被包裹的内容）
+    return <div className="whitespace-pre-wrap font-mono text-sm text-gray-700">{children}</div>;
+  },
+  pre: ({ children }) => {
+    // 不添加黑色背景的 pre 样式
+    return <>{children}</>;
+  },
   blockquote: ({ children, ...props }) => (
     <blockquote
       className="border-l-4 border-gray-300 pl-4 my-4 italic text-gray-600"
@@ -117,10 +129,12 @@ interface MarkdownRendererProps {
 }
 
 export function MarkdownRenderer({ content, className = '' }: MarkdownRendererProps) {
+  const cleanedContent = cleanMarkdown(content);
+  
   return (
     <div className={`prose prose-sm max-w-none ${className}`}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-        {content}
+        {cleanedContent}
       </ReactMarkdown>
     </div>
   );

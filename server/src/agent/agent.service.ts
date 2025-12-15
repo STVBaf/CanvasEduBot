@@ -27,6 +27,11 @@ export class AgentService {
     }
 
     try {
+      // 🔑 不再截断文本，传递完整内容给 Coze
+      const fullPrompt = `请总结以下课程内容，提取核心知识点和考核重点：\n\n${text}`;
+      
+      this.logger.log(`调用 Coze 生成总结，内容长度: ${text.length} 字符`);
+
       // 1. 发起对话 (Create Chat)
       const createRes = await axios.post(
         `${baseUrl}/v3/chat`,
@@ -38,7 +43,7 @@ export class AgentService {
           additional_messages: [
             {
               role: 'user',
-              content: `请总结以下课程内容，提取核心知识点和考核重点：\n\n${text.slice(0, 4000)}`,
+              content: fullPrompt,
               content_type: 'text',
             },
           ],
@@ -369,23 +374,20 @@ export class AgentService {
     }
 
     try {
-      // 1. 尝试上传文件到 Coze 获取 file_id
+      // 1. 上传文件到 Coze，获取 file_id
       let fileId: string | null = null;
-      let uploadSuccess = false;
       
-      this.logger.log(`尝试上传文件到 Coze: ${fileName} (${this.formatBytes(fileBuffer.length)}, MIME: ${mimeType})`);
+      this.logger.log(`📤 开始上传文件到 Coze: ${fileName} (${this.formatBytes(fileBuffer.length)}, MIME: ${mimeType})`);
       
       try {
         const FormData = require('form-data');
         const formData = new FormData();
         
-        // 根据 Coze 文档，字段名必须是 'file'
+        // 🔑 严格按照 Coze API 文档规范：字段名必须是 'file'
         formData.append('file', fileBuffer, {
           filename: fileName,
           contentType: mimeType,
         });
-        
-        this.logger.debug(`FormData headers: ${JSON.stringify(formData.getHeaders())}`);
 
         const uploadRes = await axios.post(
           `${baseUrl}/v1/files/upload`,
@@ -395,99 +397,52 @@ export class AgentService {
               ...formData.getHeaders(),
               Authorization: `Bearer ${cozeToken}`,
             },
-            timeout: 60000, // 60秒超时
+            timeout: 120000, // 120秒超时（大文件需要更长时间）
             maxBodyLength: Infinity,
             maxContentLength: Infinity,
           }
         );
 
-        // 打印完整响应以便调试
-        this.logger.debug(`Coze 上传响应: ${JSON.stringify(uploadRes.data)}`);
-
-        // Coze 返回的 file_id（实际字段名是 data.id，不是 data.file_id）
-        fileId = uploadRes.data?.data?.id || uploadRes.data?.data?.file_id || uploadRes.data?.file_id;
-        
-        if (fileId) {
-          uploadSuccess = true;
+        // 🔑 Coze API 返回格式: { code: 0, data: { id: "file_id" } }
+        if (uploadRes.data?.code === 0 && uploadRes.data?.data?.id) {
+          fileId = uploadRes.data.data.id;
           this.logger.log(`✅ 文件上传成功，file_id: ${fileId}`);
         } else {
-          this.logger.warn(`⚠️ 文件上传响应中未找到 file_id: ${JSON.stringify(uploadRes.data)}`);
+          this.logger.error(`❌ 文件上传失败，响应: ${JSON.stringify(uploadRes.data)}`);
+          throw new Error('文件上传返回格式异常');
         }
       } catch (uploadError: any) {
-        this.logger.warn(`⚠️ 文件上传失败: ${uploadError?.response?.data?.msg || uploadError?.message}`);
+        this.logger.error(`❌ 文件上传失败: ${uploadError?.response?.data?.msg || uploadError?.message}`);
         if (uploadError.response?.data) {
-          this.logger.warn(`Coze 上传错误详情: ${JSON.stringify(uploadError.response.data)}`);
+          this.logger.error(`详细错误: ${JSON.stringify(uploadError.response.data)}`);
         }
-        if (uploadError.response?.status) {
-          this.logger.warn(`HTTP 状态码: ${uploadError.response.status}`);
-        }
-        this.logger.warn('将尝试使用文本内容方式...');
+        throw new Error(`无法上传文件到 Coze: ${uploadError?.response?.data?.msg || uploadError?.message}`);
       }
 
       // 2. 构建提示词
       const defaultPrompt = customPrompt || this.getDefaultPromptForFileType(mimeType, fileName);
       
-      // 3. 根据 MIME 类型确定 object_string 中的 type
-      let fileType = 'file'; // 默认类型
-      if (mimeType.startsWith('image/')) {
-        fileType = 'image';
-      } else if (mimeType.startsWith('audio/')) {
-        fileType = 'audio';
-      }
-      
-      // 4. 构建消息内容
-      let messageContent: any;
-      
-      if (uploadSuccess && fileId) {
-        // 方式 1: 使用上传成功的 file_id，构建 object_string 类型消息
-        // 根据 Coze 文档，object_string 支持的字段：type, text, file_id, file_url
-        this.logger.log(`✅ 使用 object_string 方式（类型: ${fileType}）`);
-        messageContent = {
-          role: 'user',
-          content: JSON.stringify([
-            {
-              type: 'text',
-              text: defaultPrompt
-            },
-            {
-              type: fileType,  // 'file', 'image', 'audio'
-              file_id: fileId  // 文档要求：type 为 file/image/audio 时，file_id 和 file_url 至少指定一个
-            }
-          ]),
-          content_type: 'object_string'
-        };
-      } else if (mimeType.startsWith('text/') || mimeType === 'application/json' || mimeType === 'text/csv') {
-        // 方式 2: 纯文本文件，直接传文本内容
-        try {
-          const textContent = fileBuffer.toString('utf-8').slice(0, 15000);
-          const fullPrompt = `${defaultPrompt}\n\n文件名: ${fileName}\n文件内容:\n\`\`\`\n${textContent}\n\`\`\``;
-          
-          messageContent = {
-            role: 'user',
-            content: fullPrompt,
-            content_type: 'text',
-          };
-          this.logger.log('✅ 使用纯文本内容方式');
-        } catch (e) {
-          this.logger.error('❌ 文本解码失败');
-          return '（无法解析文件内容，请确保文件编码正确）';
-        }
-      } else {
-        // 方式 3: 无法上传的二进制文件，返回错误提示
-        this.logger.error('❌ 无法处理此类型的二进制文件');
-        return `抱歉，暂时无法分析该文件。\n\n原因：\n1. 文件上传到 Coze 失败\n2. 文件类型 ${mimeType} 不支持直接传输\n\n建议：\n- 检查 Coze API Token 权限\n- 确认 Bot 是否支持文件分析\n- 尝试转换为 PDF 或文本格式`;
-      }
+      // 3. 🔑 严格按照 Coze API 规范构建 object_string 消息
+      // 文档要求：content_type 为 object_string 时，content 必须是 JSON 字符串数组
+      const messageContent = {
+        role: 'user',
+        content: JSON.stringify([
+          {
+            type: 'text',
+            text: defaultPrompt
+          },
+          {
+            type: 'file',      // 🔑 文件类型统一使用 'file'
+            file_id: fileId    // 🔑 使用上传后的 file_id
+          }
+        ]),
+        content_type: 'object_string'  // 🔑 必须使用 object_string
+      };
 
-      // 4. 发起对话 - 使用 additional_messages 传递文件消息
-      this.logger.log(`调用 Coze Bot ${finalBotId}，使用 /v3/chat...`);
-      this.logger.debug(`请求体: ${JSON.stringify({
-        bot_id: finalBotId,
-        user_id: 'canvas_student_user',
-        stream: false,
-        auto_save_history: true,
-        additional_messages: [messageContent],
-      }, null, 2)}`);
-      
+      this.logger.log(`📨 准备发送消息到 Coze Bot ${finalBotId}`);
+      this.logger.debug(`消息内容: ${JSON.stringify(messageContent, null, 2)}`);
+
+      // 4. 发起对话
       const createRes = await axios.post(
         `${baseUrl}/v3/chat`,
         {
@@ -495,13 +450,14 @@ export class AgentService {
           user_id: 'canvas_student_user',
           stream: false,
           auto_save_history: true,
-          additional_messages: [messageContent], // 使用 additional_messages 传递消息
+          additional_messages: [messageContent],
         },
         {
           headers: {
             Authorization: `Bearer ${cozeToken}`,
             'Content-Type': 'application/json',
           },
+          timeout: 180000, // 3分钟超时（文件分析需要更长时间）
         }
       );
 
@@ -529,14 +485,14 @@ export class AgentService {
         return '对话创建失败，请检查 Bot ID 和 API Token';
       }
       
-      this.logger.log(`对话已创建: chat_id=${chatId}, conversation_id=${conversationId}`);
+      this.logger.log(`对话创建成功，chat_id: ${chatId}, conversation_id: ${conversationId}`);
 
       // 5. 轮询等待 AI 完成
       let status = createRes.data.data.status;
       let retryCount = 0;
-      const maxRetries = 60;
+      const maxRetries = 90; // 文件分析最多等待 3 分钟（每次2秒）
 
-      this.logger.log(`开始轮询对话状态，初始状态: ${status}`);
+      this.logger.log(`开始轮询，初始状态: ${status}`);
 
       while (status === 'in_progress' && retryCount < maxRetries) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -551,11 +507,13 @@ export class AgentService {
         status = retrieveRes.data.data.status;
         retryCount++;
         
-        this.logger.log(`轮询 ${retryCount}/${maxRetries}: 状态=${status}`);
+        if (retryCount % 10 === 0) {
+          this.logger.log(`轮询中... (${retryCount}/${maxRetries}), 当前状态: ${status}`);
+        }
         
         if (status === 'failed' || status === 'requires_action') {
           this.logger.error(`Bot 处理失败，状态: ${status}`);
-          return '（AI 处理中断或失败）';
+          throw new Error(`AI 处理失败: ${status}`);
         }
       }
 
@@ -576,20 +534,23 @@ export class AgentService {
           this.logger.log(`✅ 获取到 AI 回复，长度: ${answerMsg.content?.length || 0} 字符`);
           return answerMsg.content;
         } else {
-          this.logger.warn('未找到 AI 回复消息');
-          return '（AI 未返回有效分析）';
+          this.logger.warn('⚠️ 未找到 AI 回复消息');
+          throw new Error('AI 未返回有效分析');
         }
       }
 
-      this.logger.warn(`对话超时，最终状态: ${status}`);
-      return '（AI 响应超时）';
+      this.logger.warn(`⚠️ 对话超时，最终状态: ${status}`);
+      throw new Error('AI 响应超时');
 
     } catch (error: any) {
-      this.logger.error(`调用 Coze 文件分析 API 失败: ${error?.response?.data?.msg || error?.message || error}`);
+      this.logger.error(`❌ Coze 文件分析失败: ${error?.response?.data?.msg || error?.message || error}`);
       if (error.response?.data) {
         this.logger.error(`错误详情: ${JSON.stringify(error.response.data)}`);
       }
-      return `分析失败: ${error?.response?.data?.msg || error?.message || '未知错误'}`;
+      
+      // 返回详细错误信息
+      const errorMsg = error?.response?.data?.msg || error?.message || '未知错误';
+      return `文件分析失败：${errorMsg}\n\n请检查：\n1. Coze API Token 是否有效\n2. Bot 是否支持文件分析\n3. 文件格式是否被支持`;
     }
   }
 
@@ -607,6 +568,185 @@ export class AgentService {
       return '请分析这个Excel表格的数据和结构。';
     } else {
       return '请分析这个文件，给出详细的解读和总结。';
+    }
+  }
+
+  /**
+   * 生成课程总结（支持文本+多个文件一起发送）
+   * @param text 大纲文本内容
+   * @param files 要分析的文件列表
+   * @param botId Bot ID（可选）
+   */
+  async generateSummaryWithFiles(
+    text: string,
+    files: Array<{ buffer: Buffer; fileName: string; contentType: string }>,
+    botId?: string
+  ): Promise<string> {
+    const cozeToken = process.env.COZE_API_TOKEN;
+    const defaultBotId = process.env.COZE_BOT_ID;
+    const finalBotId = botId || defaultBotId;
+    const baseUrl = process.env.COZE_BASE_URL || 'https://api.coze.cn';
+
+    if (!cozeToken) {
+      this.logger.error('❌ 未配置 COZE_API_TOKEN');
+      return '（AI 服务配置缺失：缺少 API Token）';
+    }
+
+    if (!finalBotId) {
+      this.logger.error('❌ 未提供 Bot ID 且环境变量未配置 COZE_BOT_ID');
+      return '（AI 服务配置缺失：缺少 Bot ID）';
+    }
+
+    try {
+      // 1. 上传所有文件到 Coze
+      const fileIds: string[] = [];
+      
+      this.logger.log(`📤 开始上传 ${files.length} 个文件到 Coze...`);
+      
+      for (const file of files) {
+        try {
+          this.logger.log(`上传文件: ${file.fileName} (${this.formatBytes(file.buffer.length)})`);
+          
+          const FormData = require('form-data');
+          const formData = new FormData();
+          formData.append('file', file.buffer, {
+            filename: file.fileName,
+            contentType: file.contentType,
+          });
+
+          const uploadRes = await axios.post(
+            `${baseUrl}/v1/files/upload`,
+            formData,
+            {
+              headers: {
+                ...formData.getHeaders(),
+                Authorization: `Bearer ${cozeToken}`,
+              },
+              timeout: 120000,
+            }
+          );
+
+          const fileId = uploadRes.data?.data?.id;
+          if (fileId) {
+            fileIds.push(fileId);
+            this.logger.log(`✅ 文件 ${file.fileName} 上传成功，file_id: ${fileId}`);
+          } else {
+            this.logger.warn(`⚠️  文件 ${file.fileName} 上传失败，响应: ${JSON.stringify(uploadRes.data)}`);
+          }
+        } catch (uploadError: any) {
+          this.logger.error(`文件 ${file.fileName} 上传失败: ${uploadError?.message || uploadError}`);
+        }
+      }
+
+      // 2. 构建 object_string 消息内容（文本 + 所有文件）
+      const messageContent: any[] = [
+        {
+          type: 'text',
+          text: `请总结以下课程内容，提取核心知识点和考核重点：\n\n${text}\n\n以下是课程大纲引用的教学文件，请一并分析：`
+        }
+      ];
+
+      // 添加所有文件
+      fileIds.forEach((fileId, index) => {
+        messageContent.push({
+          type: 'file',
+          file_id: fileId
+        });
+      });
+
+      const contentString = JSON.stringify(messageContent);
+      
+      this.logger.log(`📨 准备发送消息到 Coze Bot ${finalBotId}`);
+      this.logger.log(`消息包含: ${text.length} 字符文本 + ${fileIds.length} 个文件`);
+
+      // 3. 创建对话
+      const createRes = await axios.post(
+        `${baseUrl}/v3/chat`,
+        {
+          bot_id: finalBotId,
+          user_id: 'canvas_student_user',
+          stream: false,
+          auto_save_history: true,
+          additional_messages: [
+            {
+              role: 'user',
+              content: contentString,
+              content_type: 'object_string',
+            },
+          ],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${cozeToken}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 180000, // 3分钟超时
+        },
+      );
+
+      const chatId = createRes.data.data.id;
+      const conversationId = createRes.data.data.conversation_id;
+
+      this.logger.log(`对话创建成功，chat_id: ${chatId}, conversation_id: ${conversationId}`);
+
+      // 4. 轮询等待 AI 完成
+      let status = createRes.data.data.status;
+      let retryCount = 0;
+      const maxRetries = 90; // 90秒超时
+
+      this.logger.log(`开始轮询，初始状态: ${status}`);
+
+      while (status === 'in_progress' && retryCount < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, 2000)); // 每2秒检查一次
+        
+        const retrieveRes = await axios.get(
+          `${baseUrl}/v3/chat/retrieve?chat_id=${chatId}&conversation_id=${conversationId}`,
+          {
+            headers: { Authorization: `Bearer ${cozeToken}` },
+          },
+        );
+        
+        status = retrieveRes.data.data.status;
+        retryCount++;
+        
+        if (retryCount % 5 === 0) {
+          this.logger.log(`轮询中... (${retryCount}/${maxRetries}), 当前状态: ${status}`);
+        }
+        
+        if (status === 'failed' || status === 'requires_action') {
+          this.logger.error(`对话失败，状态: ${status}`);
+          return '（AI 处理中断或失败）';
+        }
+      }
+
+      // 5. 获取回复
+      if (status === 'completed') {
+        this.logger.log('对话完成，正在获取消息...');
+        
+        const listRes = await axios.get(
+          `${baseUrl}/v3/chat/message/list?chat_id=${chatId}&conversation_id=${conversationId}`,
+          {
+            headers: { Authorization: `Bearer ${cozeToken}` },
+          },
+        );
+
+        const messages = listRes.data.data;
+        const answerMsg = messages.find((msg: any) => msg.type === 'answer' && msg.role === 'assistant');
+
+        if (answerMsg) {
+          this.logger.log(`✅ 获取到 AI 回复，长度: ${answerMsg.content.length} 字符`);
+          return answerMsg.content;
+        }
+        
+        return '（AI 未返回有效总结）';
+      }
+
+      this.logger.warn(`AI 响应超时，最终状态: ${status}`);
+      return '（AI 响应超时，请稍后重试）';
+
+    } catch (error: any) {
+      this.logger.error(`调用 Coze API 失败: ${error?.response?.data?.msg || error?.message || error}`);
+      return '（AI 服务暂时不可用）';
     }
   }
 

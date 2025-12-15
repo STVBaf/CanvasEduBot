@@ -64,24 +64,33 @@ import {
       }
   
       try {
-        let contentText = body.text;
-  
         // 3. 如果没有提供文本，则自动收集课程内容
-        if (!contentText) {
+        if (!body.text) {
           this.logger.log(`开始收集课程 ${body.courseId} 的内容...`);
-          contentText = await this.collectCourseContent(token, body.courseId);
-        }
-  
-        // 4. 调用 Agent 生成总结
-        this.logger.log(`开始生成课程 ${body.courseId} 的 AI 总结...`);
-        const summary = await this.agentService.generateSummary(contentText, body.botId);
+          const { text, files } = await this.collectCourseContent(token, body.courseId);
+          
+          // 4. 调用 Agent 生成总结（同时发送文本和文件）
+          this.logger.log(`开始生成课程 ${body.courseId} 的 AI 总结 (文本: ${text.length}字符, 文件: ${files.length}个)...`);
+          const summary = await this.agentService.generateSummaryWithFiles(text, files, body.botId);
 
-        return {
-          content: summary,
-          courseId: body.courseId,
-          botId: body.botId,
-          generatedAt: new Date().toISOString(),
-        };
+          return {
+            content: summary,
+            courseId: body.courseId,
+            botId: body.botId,
+            generatedAt: new Date().toISOString(),
+          };
+        } else {
+          // 如果提供了文本，使用原来的方法
+          this.logger.log(`开始生成课程 ${body.courseId} 的 AI 总结...`);
+          const summary = await this.agentService.generateSummary(body.text, body.botId);
+
+          return {
+            content: summary,
+            courseId: body.courseId,
+            botId: body.botId,
+            generatedAt: new Date().toISOString(),
+          };
+        }
       } catch (error: any) {
         this.logger.error(`生成课程总结失败: ${error?.message || error}`, error?.stack);
         throw error;
@@ -90,9 +99,14 @@ import {
   
     /**
      * 收集课程内容（作业、文件等）
+     * @returns { text: string, files: Array<{ buffer, fileName, contentType }> }
      */
-    private async collectCourseContent(accessToken: string, courseId: string): Promise<string> {
+    private async collectCourseContent(
+      accessToken: string, 
+      courseId: string
+    ): Promise<{ text: string; files: Array<{ buffer: Buffer; fileName: string; contentType: string }> }> {
       const parts: string[] = [];
+      const syllabusFiles: Array<{ buffer: Buffer; fileName: string; contentType: string }> = [];
 
       // 统一的截断工具，避免 Coze 输入过长
       const truncate = (text: string, max: number) => {
@@ -100,7 +114,7 @@ import {
         return text.length <= max ? text : `${text.slice(0, max)}...`;
       };
 
-      // 最终组装时控制总长（优先级：课程简介/大纲 > 作业 > 大纲引用文件 > 文件名）
+      // 最终组装时控制总长（优先级：课程简介/大纲 > 作业 > 文件名）
       const appendWithBudget = (arr: string[], budget: { remain: number }, chunk: string) => {
         if (!chunk) return;
         const safe = truncate(chunk, budget.remain);
@@ -109,7 +123,7 @@ import {
         budget.remain -= safe.length;
       };
 
-      const budget = { remain: 3800 }; // 留出提示词空间，避免被 generateSummary 再截断
+      const budget = { remain: 20000 }; // 🔑 扩大总预算到 20000 字符，确保大纲完整传递
   
       try {
         // 1. 获取课程基本信息
@@ -161,20 +175,35 @@ import {
           const syllabus = await this.canvasService.getCourseSyllabus(accessToken, courseId);
           if (syllabus?.text) {
             this.logger.log(`✅ 课程大纲获取成功，文本长度: ${syllabus.text.length}，引用文件: ${syllabus.files?.length || 0}`);
-            appendWithBudget(parts, budget, '=== 课程大纲（精简） ===');
-            appendWithBudget(parts, budget, truncate(syllabus.text, 1500));
+            appendWithBudget(parts, budget, '=== 课程大纲（完整） ===');
+            // 🔑 取消大纲字数限制，传递完整内容
+            appendWithBudget(parts, budget, syllabus.text);
             appendWithBudget(parts, budget, '');
           } else {
             this.logger.warn(`⚠️  课程 ${courseId} 的大纲为空`);
           }
 
+          // 🔑 下载大纲中引用的文件（不分析，稍后一起发送给 Agent）
           if (syllabus?.files?.length) {
-            appendWithBudget(parts, budget, '=== 大纲引用文件（最多5个）===');
-            syllabus.files.forEach((file) => {
-              if (budget.remain <= 0) return;
-              appendWithBudget(parts, budget, `文件: ${file.name} (ID: ${file.id}${file.url ? `, URL: ${file.url}` : ''})`);
-            });
-            appendWithBudget(parts, budget, '');
+            this.logger.log(`开始下载大纲引用的 ${syllabus.files.length} 个文件...`);
+            
+            for (const file of syllabus.files.slice(0, 3)) { // 最多处理3个文件
+              try {
+                this.logger.log(`正在下载文件: ${file.name} (ID: ${file.id})`);
+                const fileContent = await this.filesService.downloadSingleFile(accessToken, file.id);
+                
+                // 添加到文件列表中（稍后一起发送给 Agent）
+                syllabusFiles.push({
+                  buffer: fileContent.buffer,
+                  fileName: fileContent.fileName,
+                  contentType: fileContent.contentType,
+                });
+                
+                this.logger.log(`✅ 文件下载完成: ${file.name} (${this.formatBytes(fileContent.size)})`);
+              } catch (fileError: any) {
+                this.logger.warn(`文件 ${file.name} 下载失败: ${fileError?.message || fileError}`);
+              }
+            }
           }
         } catch (error: any) {
           this.logger.warn(`获取课程大纲失败: ${error?.message || error}`);
@@ -196,16 +225,26 @@ import {
   
         const fullText = parts.join('\n');
         
-        if (fullText.trim().length === 0) {
-          return `课程ID: ${courseId} 的相关信息`;
+        if (fullText.trim().length === 0 && syllabusFiles.length === 0) {
+          return { text: `课程ID: ${courseId} 的相关信息`, files: [] };
         }
 
-        return fullText;
+        return { text: fullText, files: syllabusFiles };
       } catch (error: any) {
         this.logger.error(`收集课程内容失败: ${error?.message || error}`);
         // 如果收集失败，至少返回课程ID
-        return `课程ID: ${courseId} 的相关信息`;
+        return { text: `课程ID: ${courseId} 的相关信息`, files: [] };
       }
+    }
+
+    /**
+     * 格式化字节数为可读形式
+     */
+    private formatBytes(bytes: number): string {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+      if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+      return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
     }
 
     /**
