@@ -172,6 +172,71 @@ export class GroupsService {
   }
 
   /**
+   * 获取所有课程的所有小组（全局公开列表）
+   */
+  async getAllGroups(accessToken: string) {
+    const user = await this.getUserByToken(accessToken); // 验证用户登录
+
+    const groups = await this.prisma.group.findMany({
+      where: {
+        isActive: true,
+      },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+          }
+        },
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                avatar: true,
+              }
+            }
+          }
+        },
+        _count: {
+          select: {
+            members: true,
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc',
+      }
+    });
+
+    return groups.map(group => ({
+      id: group.id,
+      courseId: group.courseId,
+      courseName: group.courseName,
+      name: group.name,
+      description: group.description,
+      creator: group.creator,
+      isCreator: group.creatorId === user.id,
+      isMember: group.members.some(m => m.userId === user.id),
+      isActive: group.isActive,
+      memberCount: group._count.members,
+      members: group.members.map(m => ({
+        id: m.id,
+        userId: m.userId,
+        role: m.role,
+        joinedAt: m.joinedAt,
+        user: m.user,
+      })),
+      createdAt: group.createdAt,
+      updatedAt: group.updatedAt,
+    }));
+  }
+
+  /**
    * 获取指定课程的所有小组（公开列表）
    */
   async getCourseGroups(accessToken: string, courseId: string) {

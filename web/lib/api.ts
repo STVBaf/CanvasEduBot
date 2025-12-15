@@ -164,6 +164,11 @@ export const api = {
     const response = await apiClient.get<{ groups: StudyGroup[] }>(url); 
     return response.data.groups; 
   },
+  // 获取所有课程的所有小组（全局公开列表，用于浏览和加入）
+  getAllGroups: async (): Promise<StudyGroup[]> => { 
+    const response = await apiClient.get<{ groups: StudyGroup[] }>('/groups/all'); 
+    return response.data.groups; 
+  },
   // 获取课程的所有小组（对所有学生可见）
   getCourseGroups: async (courseId: string): Promise<StudyGroup[]> => { 
     const response = await apiClient.get<{ groups: StudyGroup[] }>(`/groups/course/${courseId}`); 

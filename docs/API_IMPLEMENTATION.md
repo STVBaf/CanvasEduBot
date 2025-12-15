@@ -280,7 +280,56 @@ Content-Length: 1024000
 }
 ```
 
-### 4.3 获取指定课程的所有小组
+### 4.3 获取所有课程的所有小组
+
+**接口：** `GET /api/groups/all`
+
+**描述：** 获取所有课程的所有活跃小组（全局公开列表），用于浏览和加入小组。包含 `isCreator` 和 `isMember` 标识，方便前端判断用户与小组的关系。
+
+**响应示例：**
+```json
+{
+  "groups": [
+    {
+      "id": "group_123",
+      "courseId": "101",
+      "courseName": "软件工程",
+      "name": "第一小组",
+      "description": "学习小组",
+      "creator": {
+        "id": "user_123",
+        "name": "张三"
+      },
+      "isCreator": false,
+      "isMember": false,
+      "isActive": true,
+      "memberCount": 4,
+      "members": [...],
+      "createdAt": "2024-12-01T10:00:00Z"
+    },
+    {
+      "id": "group_456",
+      "courseId": "102",
+      "courseName": "数据结构",
+      "name": "算法学习组",
+      "description": "专注算法练习",
+      "creator": {
+        "id": "user_456",
+        "name": "李四"
+      },
+      "isCreator": false,
+      "isMember": true,
+      "isActive": true,
+      "memberCount": 3,
+      "members": [...],
+      "createdAt": "2024-12-02T10:00:00Z"
+    }
+  ],
+  "total": 2
+}
+```
+
+### 4.4 获取指定课程的所有小组
 
 **接口：** `GET /api/groups/course/:courseId`
 
@@ -313,7 +362,40 @@ Content-Length: 1024000
 }
 ```
 
-### 4.4 获取小组详情
+### 4.4 获取指定课程的所有小组
+
+**接口：** `GET /api/groups/course/:courseId`
+
+**描述：** 获取指定课程的所有活跃小组（公开列表，所有学生可见）。返回成员列表用于前端显示和"我是否已加入"判断。
+
+**路径参数：**
+- `courseId`: 课程 ID
+
+**响应示例：**
+```json
+{
+  "courseId": "101",
+  "groups": [
+    {
+      "id": "group_123",
+      "courseId": "101",
+      "courseName": "软件工程",
+      "name": "第一小组",
+      "description": "学习小组",
+      "creator": {
+        "id": "user_123",
+        "name": "张三"
+      },
+      "isActive": true,
+      "memberCount": 4,
+      "createdAt": "2024-12-01T10:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### 4.5 获取小组详情
 
 **接口：** `GET /api/groups/:groupId`
 
@@ -371,7 +453,65 @@ Content-Length: 1024000
 }
 ```
 
-### 4.5 加入小组
+### 4.5 获取小组详情
+
+**接口：** `GET /api/groups/:groupId`
+
+**描述：** 获取小组的详细信息，包括所有成员
+
+**路径参数：**
+- `groupId`: 小组 ID
+
+**响应示例：**
+```json
+{
+  "id": "group_123",
+  "courseId": "101",
+  "courseName": "软件工程",
+  "name": "第一小组",
+  "description": "学习小组",
+  "creator": {
+    "id": "user_123",
+    "name": "张三",
+    "email": "zhang@example.com",
+    "avatar": "https://..."
+  },
+  "isCreator": false,
+  "isMember": true,
+  "isActive": true,
+  "memberCount": 4,
+  "members": [
+    {
+      "id": "member_1",
+      "userId": "user_123",
+      "role": "creator",
+      "joinedAt": "2024-12-01T10:00:00Z",
+      "user": {
+        "id": "user_123",
+        "name": "张三",
+        "email": "zhang@example.com",
+        "avatar": "https://..."
+      }
+    },
+    {
+      "id": "member_2",
+      "userId": "user_456",
+      "role": "member",
+      "joinedAt": "2024-12-01T11:00:00Z",
+      "user": {
+        "id": "user_456",
+        "name": "李四",
+        "email": "li@example.com",
+        "avatar": "https://..."
+      }
+    }
+  ],
+  "createdAt": "2024-12-01T10:00:00Z",
+  "updatedAt": "2024-12-01T10:00:00Z"
+}
+```
+
+### 4.6 加入小组
 
 **接口：** `POST /api/groups/:groupId/join`
 
@@ -400,7 +540,36 @@ Content-Length: 1024000
 }
 ```
 
-### 4.6 退出小组
+### 4.6 加入小组
+
+**接口：** `POST /api/groups/:groupId/join`
+
+**描述：** 加入指定的小组
+
+**路径参数：**
+- `groupId`: 小组 ID
+
+**响应示例：**
+```json
+{
+  "success": true,
+  "message": "成功加入小组",
+  "member": {
+    "id": "member_2",
+    "userId": "user_456",
+    "role": "member",
+    "joinedAt": "2024-12-01T11:00:00Z",
+    "user": {
+      "id": "user_456",
+      "name": "李四",
+      "email": "li@example.com",
+      "avatar": "https://..."
+    }
+  }
+}
+```
+
+### 4.7 退出小组
 
 **接口：** `POST /api/groups/:groupId/leave`
 
@@ -417,7 +586,7 @@ Content-Length: 1024000
 }
 ```
 
-### 4.7 更新小组信息
+### 4.8 更新小组信息
 
 **接口：** `PUT /api/groups/:groupId`
 
@@ -454,7 +623,44 @@ Content-Length: 1024000
 }
 ```
 
-### 4.8 删除小组
+### 4.8 更新小组信息
+
+**接口：** `PUT /api/groups/:groupId`
+
+**描述：** 更新小组信息（仅创建者可操作）
+
+**路径参数：**
+- `groupId`: 小组 ID
+
+**请求体：**
+```json
+{
+  "name": "新的小组名称",
+  "description": "新的描述",
+  "isActive": true
+}
+```
+
+**响应示例：**
+```json
+{
+  "success": true,
+  "message": "小组信息已更新",
+  "group": {
+    "id": "group_123",
+    "courseId": "101",
+    "courseName": "软件工程",
+    "name": "新的小组名称",
+    "description": "新的描述",
+    "isActive": true,
+    "memberCount": 4,
+    "createdAt": "2024-12-01T10:00:00Z",
+    "updatedAt": "2024-12-02T09:00:00Z"
+  }
+}
+```
+
+### 4.9 删除小组
 
 **接口：** `DELETE /api/groups/:groupId`
 
@@ -471,7 +677,7 @@ Content-Length: 1024000
 }
 ```
 
-### 4.9 移除小组成员
+### 4.10 移除小组成员
 
 **接口：** `DELETE /api/groups/:groupId/members/:memberId`
 
